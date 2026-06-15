@@ -2,6 +2,9 @@
 name: gcp-cloudsql-infrastructure
 description: Cloud SQL PostgreSQL infrastructure provisioning and operations. Machine type selection, storage sizing, HA configuration, backup strategies, VPC networking. Use when configuring Cloud SQL instances, planning database capacity, setting up backups, or designing high availability.
 allowed-tools: Read, Grep, Glob
+kb-sources:
+  - wiki/software-engineering/gcp-cloudsql
+updated: 2026-05-21
 ---
 
 # Cloud SQL Infrastructure
@@ -35,7 +38,7 @@ Infrastructure-level patterns for Google Cloud SQL PostgreSQL provisioning and o
 | `PD_HDD` | $0.09 | Lower | 10-20ms | Cost-sensitive staging |
 | `PD_SSD` | $0.17 | Higher | 1-5ms | Production, performance testing |
 
-**Rule:** Use SSD for any workload where query latency matters.
+PD_HDD runs ~10–20ms latency vs PD_SSD at ~1–5ms — HDD noticeably degrades response time on query-latency-sensitive workloads.
 
 ## High Availability
 
@@ -62,5 +65,5 @@ Infrastructure-level patterns for Google Cloud SQL PostgreSQL provisioning and o
 | Prod (small) | db-standard-1 | 50GB SSD | REGIONAL | ~$110 |
 | Prod (medium) | db-standard-2 | 100GB SSD | REGIONAL | ~$200 |
 
-See `reference.md` for sizing calculations, VPC networking, and performance tuning.
-See `examples.md` for complete Terraform module and tier upgrade configurations.
+See `reference.md` for sizing calculations, VPC networking, and Terraform patterns.
+See `examples.md` for complete Terraform configurations.

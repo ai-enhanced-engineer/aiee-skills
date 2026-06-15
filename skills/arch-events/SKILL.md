@@ -2,6 +2,9 @@
 name: arch-events
 description: Event-driven architecture patterns for Python including Domain Events, Commands, Message Bus, CQRS, and Bootstrap. Use for implementing event sourcing, decoupled workflows, reactive systems, microservices integration, or making decisions about event-driven design.
 allowed-tools: Read, Grep, Glob
+kb-sources:
+  - wiki/software-engineering/arch-events
+updated: 2026-05-20
 ---
 
 # Event-Driven Architecture
@@ -10,7 +13,7 @@ Patterns for building reactive, decoupled Python applications using domain event
 
 ## Foundation
 
-These patterns build on domain-driven architecture principles (see `domain-driven-architecture` skill for Repository, Service Layer, Unit of Work, and Aggregates).
+These patterns build on domain-driven design principles — see the `arch-ddd` skill for Repository, Service Layer, Unit of Work, and Aggregates.
 
 ## Core Patterns
 
@@ -26,7 +29,7 @@ Instructions to perform actions - requests that may fail.
 
 - Imperative naming (`Allocate`, `CreateBatch`)
 - Exactly one handler per command
-- Fail noisily with exceptions
+- Surface failures as exceptions — a swallowed failure leaves callers unable to tell success from failure
 
 ### Message Bus
 Central routing for commands and events.

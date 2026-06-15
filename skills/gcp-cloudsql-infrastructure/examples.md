@@ -21,7 +21,7 @@ db_pitr_enabled   = false
 # Estimated cost: ~$30/month
 ```
 
-### Core Terraform Module
+### Full Terraform Module
 
 ```hcl
 # modules/cloudsql/main.tf
@@ -68,7 +68,7 @@ variable "db_disk_type" {
 variable "database_name" {
   description = "Name of the database to create"
   type        = string
-  default     = "appdb"
+  default     = "acme"
 }
 
 # Random suffix for instance name (required for recreation)
@@ -115,6 +115,14 @@ resource "google_sql_database_instance" "main" {
       name  = "log_min_duration_statement"
       value = "1000"
     }
+
+    insights_config {
+      query_insights_enabled  = true
+      query_plans_per_minute  = 5
+      query_string_length     = 1024
+      record_application_tags = true
+      record_client_address   = true
+    }
   }
 
   deletion_protection = var.environment == "production"
@@ -144,6 +152,19 @@ resource "google_sql_user" "app" {
   project  = var.project_id
 }
 
+# Migration User (elevated privileges)
+resource "random_password" "migration_password" {
+  length  = 32
+  special = false
+}
+
+resource "google_sql_user" "migration" {
+  name     = "migration_user"
+  instance = google_sql_database_instance.main.name
+  password = random_password.migration_password.result
+  project  = var.project_id
+}
+
 # Outputs
 output "instance_name" {
   value       = google_sql_database_instance.main.name
@@ -164,6 +185,155 @@ output "app_user_password" {
   value       = random_password.app_password.result
   sensitive   = true
   description = "Application user password (store in Secret Manager)"
+}
+
+output "migration_user_password" {
+  value       = random_password.migration_password.result
+  sensitive   = true
+  description = "Migration user password (store in Secret Manager)"
+}
+```
+
+---
+
+## Production Environment Configuration
+
+High-availability configuration for production.
+
+```hcl
+# production.tfvars
+
+# Cloud SQL Configuration
+db_tier           = "db-standard-2"
+db_disk_size      = 100
+db_disk_type      = "PD_SSD"
+db_availability   = "REGIONAL"
+db_backup_enabled = true
+db_backup_count   = 30
+db_pitr_enabled   = true
+
+# Estimated cost: ~$200/month
+```
+
+---
+
+## Private Service Access Setup
+
+Required for private IP connectivity.
+
+```hcl
+# modules/vpc/private_service_access.tf
+
+# Reserve IP range for Google services
+resource "google_compute_global_address" "private_ip_range" {
+  name          = "google-managed-services-${var.network_name}"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.main.id
+  project       = var.project_id
+}
+
+# Create private connection to Google services
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.main.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
+}
+```
+
+---
+
+## VPC Connector for Cloud Run
+
+Connect Cloud Run to Cloud SQL via private network.
+
+```hcl
+# modules/vpc/connector.tf
+
+resource "google_vpc_access_connector" "main" {
+  name          = "${var.project_id}-${var.environment}-connector"
+  region        = var.region
+  project       = var.project_id
+  network       = google_compute_network.main.name
+  ip_cidr_range = "10.8.0.0/28"
+
+  min_instances = 2
+  max_instances = var.environment == "production" ? 10 : 3
+
+  machine_type = "e2-micro"
+}
+
+# Output for Cloud Run service
+output "vpc_connector_id" {
+  value       = google_vpc_access_connector.main.id
+  description = "VPC connector ID for Cloud Run"
+}
+```
+
+---
+
+## Cloud Run Connection Example
+
+Reference VPC connector in Cloud Run service.
+
+```hcl
+# modules/cloudrun/main.tf
+
+resource "google_cloud_run_v2_service" "api" {
+  name     = "${var.project_id}-${var.environment}-api"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    containers {
+      image = var.image_url
+
+      env {
+        name  = "DATABASE_URL"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.db_url.secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+
+    vpc_access {
+      connector = var.vpc_connector_id
+      egress    = "PRIVATE_RANGES_ONLY"
+    }
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 10
+    }
+  }
+}
+```
+
+---
+
+## Database URL Secret
+
+Store connection string in Secret Manager.
+
+```hcl
+# modules/secrets/database.tf
+
+resource "google_secret_manager_secret" "db_url" {
+  secret_id = "${var.environment}-database-url"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "db_url" {
+  secret      = google_secret_manager_secret.db_url.id
+  secret_data = "postgresql+asyncpg://${google_sql_user.app.name}:${random_password.app_password.result}@${google_sql_database_instance.main.private_ip_address}:5432/${var.database_name}"
 }
 ```
 

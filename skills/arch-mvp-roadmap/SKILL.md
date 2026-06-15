@@ -1,6 +1,9 @@
 ---
 name: arch-mvp-roadmap
 description: MVP definition, MoSCoW prioritization, and phased delivery planning. Use for scoping minimum viable products, ordering features by value and dependency, or creating implementation roadmaps.
+kb-sources:
+  - wiki/software-engineering/arch-mvp-roadmap
+updated: 2026-05-21
 ---
 
 # MVP & Roadmap Planning
@@ -19,8 +22,22 @@ An MVP is not a half-built product—it's a complete vertical slice that validat
 |----------|------------|----------|
 | **Must Have** | System doesn't function without | Core journey incomplete, no workarounds |
 | **Should Have** | Important but not blocking | Workarounds exist, high value |
+| **Visible as Placeholder** | UI ships visible but non-functional at launch; wired up in a later phase | Surface needed for UX coherence/nav completeness; functionality deferred |
 | **Could Have** | Nice to have | Enhances experience, low priority |
 | **Won't Have** | Explicitly out of scope | Prevents scope creep, document for later |
+
+### Visible-as-Placeholder Tier — When To Use
+
+Standard MoSCoW leaves a gap: features that need to be *visible* at launch but not *functional* yet. Naming this tier explicitly makes the app feel coherent without over-promising.
+
+**Use Visible-as-Placeholder (not Could-have) when**:
+- Removing the surface would leave a hole in nav, settings, or a flow users will notice
+- A linked feature elsewhere references this surface (deep links, empty-state CTAs, dashboard tiles)
+- The functional version is planned for a known later phase
+
+**Use Could-have instead when** the feature's absence is invisible or there is no committed plan to ship it.
+
+See `reference.md § Visible-as-Placeholder` for a worked marketplace example with five surfaces.
 
 ## MVP Scoping Checklist
 
@@ -59,26 +76,6 @@ Order features by:
 
 ## Extensible Algorithm Design
 
-Design algorithms for evolution using stable interfaces. MVP delivers value immediately while building ground truth for future ML phases.
+Design algorithms for evolution using stable interfaces. MVP delivers value immediately while building ground truth for future ML phases. Evolution path: Deterministic (MVP) → Statistical (Phase 2) → ML/embeddings (Phase 3) → LLM-powered (Phase 4). Switch implementations via dependency injection against a stable Protocol interface; MVP uses zero ML infrastructure.
 
-**Evolution path:**
-1. **MVP:** Deterministic algorithm (keyword matching, rule-based)
-2. **Phase 2:** Statistical approach (TF-IDF, collaborative filtering)
-3. **Phase 3:** ML/embeddings (neural networks, transformers)
-4. **Phase 4:** LLM-powered (if needed)
-
-**Interface pattern:**
-```python
-class Categorizer(Protocol):
-    def categorize(self, text: str) -> tuple[str, float]:
-        """Returns (category, confidence_score)"""
-        ...
-```
-
-**Key principles:**
-- MVP uses zero ML infrastructure (no model serving, no embeddings DB)
-- Interface stays stable across phases (same input/output signature)
-- Each phase is independently measurable (track accuracy improvement)
-- Switch implementations via dependency injection, not rewrite
-
-See `reference.md` for detailed patterns and `examples.md` for sample roadmaps.
+See `reference.md § Extensible Algorithm Design` for the interface pattern, key principles, and workstream-split sizing. See `examples.md` for sample roadmaps.

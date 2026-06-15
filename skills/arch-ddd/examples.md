@@ -40,14 +40,22 @@ class Batch:
         if self.can_allocate(line):
             self._allocations.add(line)
 
+    def deallocate(self, line: OrderLine) -> None:
+        if line in self._allocations:
+            self._allocations.remove(line)
+
     def can_allocate(self, line: OrderLine) -> bool:
         """Encapsulate business rules."""
         return self.sku == line.sku and self.available_quantity >= line.qty
 
     @property
+    def allocated_quantity(self) -> int:
+        return sum(line.qty for line in self._allocations)
+
+    @property
     def available_quantity(self) -> int:
         """Derived properties express business concepts."""
-        return self._purchased_quantity - sum(line.qty for line in self._allocations)
+        return self._purchased_quantity - self.allocated_quantity
 ```
 
 ### Value Object with Behavior
@@ -115,6 +123,58 @@ class FakeBatchRepository(AbstractBatchRepository):
         return [b for b in self._batches if b.sku == sku]
 ```
 
+### SQLAlchemy Repository
+
+```python
+from sqlalchemy.orm import Session
+
+class SqlAlchemyBatchRepository(AbstractBatchRepository):
+    def __init__(self, session: Session):
+        self.session = session
+
+    def add(self, batch: Batch) -> None:
+        self.session.add(batch)
+
+    def get(self, reference: str) -> Optional[Batch]:
+        return self.session.query(Batch).filter_by(reference=reference).first()
+
+    def find_by_sku(self, sku: str) -> list[Batch]:
+        return self.session.query(Batch).filter_by(sku=sku).all()
+```
+
+## Service Layer Examples
+
+### Service Function
+
+```python
+from typing import Optional
+
+class InvalidSku(Exception):
+    pass
+
+def allocate(
+    orderid: str,
+    sku: str,
+    qty: int,
+    uow: AbstractUnitOfWork,
+) -> str:
+    """Service layer function orchestrating a use case."""
+    line = OrderLine(orderid, sku, qty)
+
+    with uow:
+        batches = uow.batches.find_by_sku(sku)
+        if not batches:
+            raise InvalidSku(f"Invalid sku {sku}")
+
+        # Domain logic determines allocation
+        batch = next(b for b in sorted(batches) if b.can_allocate(line))
+        batch.allocate(line)
+
+        uow.commit()
+
+    return batch.reference
+```
+
 ## Unit of Work Examples
 
 ### Abstract Unit of Work
@@ -153,6 +213,55 @@ class FakeUnitOfWork(AbstractUnitOfWork):
 
     def rollback(self):
         pass
+```
+
+### SQLAlchemy Unit of Work
+
+```python
+from sqlalchemy.orm import sessionmaker
+
+class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
+    def __init__(self, session_factory: sessionmaker):
+        self.session_factory = session_factory
+
+    def __enter__(self):
+        self.session = self.session_factory()
+        self.batches = SqlAlchemyBatchRepository(self.session)
+        return self
+
+    def __exit__(self, *args):
+        self.session.close()
+
+    def commit(self):
+        self.session.commit()
+
+    def rollback(self):
+        self.session.rollback()
+```
+
+## Aggregate Example
+
+```python
+class Product:
+    """Aggregate root - all modifications go through here."""
+
+    def __init__(self, sku: str, batches: list[Batch], version: int = 0):
+        self.sku = sku
+        self.batches = batches
+        self.version = version
+
+    def allocate(self, line: OrderLine) -> str:
+        """Coordinate allocation across batches."""
+        try:
+            batch = next(
+                b for b in sorted(self.batches)
+                if b.can_allocate(line)
+            )
+            batch.allocate(line)
+            self.version += 1
+            return batch.reference
+        except StopIteration:
+            raise OutOfStock(f"Out of stock for sku {line.sku}")
 ```
 
 ## Test Examples

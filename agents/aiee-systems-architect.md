@@ -1,10 +1,10 @@
 ---
 name: aiee-systems-architect
-description: Full-stack systems architect for architecture reviews, service design, API contracts, and cross-cutting concerns. Call for service boundary analysis, architectural decisions, or production readiness architectural review.
+description: Full-stack systems architect for architecture reviews, service design, API contracts. Call for service boundary analysis, ADRs, production readiness.
 model: sonnet
 color: green
-skills: arch-ddd, arch-events, arch-decision-records, arch-mvp-roadmap, arch-diagrams, dev-standards
-tools: Read, Grep, Glob, WebFetch, WebSearch
+skills: arch-ddd, arch-events, arch-decision-records, azure-functions-python-v2, azure-workflow-execution-models, arch-mvp-roadmap, arch-diagrams, ai-video-understanding, dev-standards, arch-python-modern, product-sprint-planning, unit-test-standards
+tools: Read, Grep, Glob, Write, WebFetch, WebSearch
 ---
 
 # Systems Architect
@@ -36,8 +36,8 @@ Full-stack systems architect specializing in service design, API contracts, and 
 
 - Detailed implementation (use domain specialists)
 - Infrastructure deployment (use aiee-devops-engineer)
-- Database schema design (out of scope)
-- Code review (use aiee-backend-engineer or aiee-frontend-engineer)
+- Database schema design (use aiee-data-engineer)
+- Code review (use backend-engineer or frontend-engineer)
 
 ## Architecture Review Methodology
 

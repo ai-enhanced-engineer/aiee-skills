@@ -1,44 +1,16 @@
 ---
 name: frontend-angular
-description: Modern Angular 21+ patterns including signals, standalone components, zoneless change detection, and new control flow syntax. Use for Angular architecture decisions or implementing components with latest APIs.
-trigger-terms: Angular 21+, signals, standalone components, zoneless, control flow, @if, @for
+description: Modern Angular 21+ patterns including signals, standalone components, zoneless change detection, and new control flow syntax (@if, @for). Use for Angular architecture decisions, implementing components with latest APIs, computed signal chains, select binding, ngModel two-way binding, or CanDeactivate guard patterns.
+kb-sources:
+  - wiki/software-engineering/frontend-angular
+updated: 2026-06-03
 ---
 
 # Angular Production Patterns
 
 Production-ready patterns for Angular 21+ applications with zoneless change detection.
 
-## Core Concepts
-
-### Signal-Based Reactivity
-
-```typescript
-import { Component, signal, computed, effect } from '@angular/core';
-
-@Component({
-  selector: 'app-counter',
-  standalone: true,
-  template: `
-    <button (click)="increment()">
-      {{ count() }} × 2 = {{ doubled() }}
-    </button>
-  `
-})
-export class CounterComponent {
-  count = signal(0);
-  doubled = computed(() => this.count() * 2);
-
-  constructor() {
-    effect(() => console.log('Count changed:', this.count()));
-  }
-
-  increment() {
-    this.count.update(n => n + 1);
-  }
-}
-```
-
-### Key APIs
+## Key APIs
 
 | API | Purpose |
 |-----|---------|
@@ -48,77 +20,7 @@ export class CounterComponent {
 | `input()` | Component inputs (replaces @Input) |
 | `output()` | Component outputs (replaces @Output) |
 | `model()` | Two-way bindable signals |
-
-## Modern Control Flow
-
-```html
-<!-- Conditionals -->
-@if (isLoading()) {
-  <app-spinner />
-} @else if (hasError()) {
-  <app-error [message]="error()" />
-} @else {
-  <app-content [data]="data()" />
-}
-
-<!-- Loops with tracking -->
-@for (item of items(); track item.id) {
-  <app-item [data]="item" />
-} @empty {
-  <p>No items found</p>
-}
-
-<!-- Switch -->
-@switch (status()) {
-  @case ('pending') { <app-pending /> }
-  @case ('active') { <app-active /> }
-  @default { <app-unknown /> }
-}
-```
-
-## Standalone Architecture
-
-```typescript
-// No NgModules - components declare their dependencies
-@Component({
-  selector: 'app-dashboard',
-  standalone: true,
-  imports: [CommonModule, RouterModule, MetricsComponent],
-  template: `...`
-})
-export class DashboardComponent {}
-
-// Bootstrapping
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideRouter(routes),
-    provideHttpClient(withInterceptors([authInterceptor]))
-  ]
-});
-```
-
-## Component I/O (Angular 21+)
-
-```typescript
-@Component({...})
-export class UserCardComponent {
-  // Input signal (required)
-  user = input.required<User>();
-
-  // Input with default
-  showAvatar = input(true);
-
-  // Output
-  selected = output<User>();
-
-  // Two-way binding
-  isExpanded = model(false);
-
-  onSelect() {
-    this.selected.emit(this.user());
-  }
-}
-```
+| `viewChild()` | Signal-based DOM queries (replaces @ViewChild) |
 
 ## Performance Targets
 
@@ -136,6 +38,10 @@ export class UserCardComponent {
 - < 100KB JS budget → Svelte or Web Components
 - React ecosystem dependency → React
 
+## Signal-Based Service Pattern
+
+Private writable signal → public readonly → update in `tap()` → component injects and reads. Matches AuthService pattern for consistency across services.
+
 ## Signal Testing Patterns
 
 | Pattern | Use Case |
@@ -144,47 +50,32 @@ export class UserCardComponent {
 | WritableSignal with `.set()` | Control signal state without reassignment |
 | NG0100 prevention | Initialize signals before `detectChanges()` |
 
-## Signal-Based Service Pattern
+## Angular 21+ Anti-Patterns
 
-Private writable signal → public readonly → update in `tap()` → component injects and reads:
+| Anti-Pattern | Pattern |
+|--------------|---------|
+| `CommonModule` in standalone imports | Remove it (`@if`/`@for` don't need it) |
+| `@ViewChild` decorator | `viewChild()` signal (reactive, no ExpressionChanged errors) |
+| `setTimeout()` in components | `timer().pipe(takeUntilDestroyed())` (prevents memory leaks) |
+| 401 handling in services | HTTP interceptor only (prevents conflicting error paths) |
+| Public injected services | Private + local signal aliases (encapsulation) |
+| Timer in service `tap()` | Auto-clear timers outlive component; move timer to component, expose `clearSaveSuccess()` on service |
+| `effect()` in `ngOnInit` | Stacks subscriptions on re-init; use `toObservable(signal)` + `switchMap` + `takeUntilDestroyed` |
+| `toObservable()` in `ngOnInit` | Throws `NG0203` — requires injection context; build chain as class field, `.subscribe()` in ngOnInit |
+| `inputs: []` metadata property | Use `input()` signal API — `@angular-eslint/no-inputs-metadata-property` flags this |
+| Direct property assignment in specs | `component.authService = mock` breaks with `protected`; use `{ provide: AuthService, useValue: mock }` in TestBed |
+| `<div (click)>` without keyboard peer | ESLint `interactive-supports-focus`: add `(keydown)` + `tabindex="0"` + semantic `role` (e.g., `role="document"` for modal containers) |
+| Single-slot in-flight marker cleared unconditionally | Capture the operation ID before the call; clear only when stored ID still matches — late responses otherwise clobber a newer operation's marker |
+| Optimistic-insert CRUD reused for ephemeral entities (preview/draft) | Add a side-effect-free HTTP method that skips signal writes; reusing list-mutating CRUD pollutes shared list/counts with internal rows |
 
-```typescript
-@Injectable({ providedIn: 'root' })
-export class AnalyticsService {
-  private _summary = signal<Summary | null>(null);
-  readonly summary = this._summary.asReadonly();
+## Select Binding Gotcha
 
-  private _loading = signal(false);
-  readonly loading = this._loading.asReadonly();
+Angular's `<select [value]="signal()">` does not select the matching `<option>` — the browser uses `selectedIndex`, not the `value` attribute. The dropdown silently appears stuck on the first option. Two fixes: `[selected]="optionValue === signal()"` per `<option>`, or importing `FormsModule` and using `[(ngModel)]`.
 
-  getSummary() {
-    this._loading.set(true);
-    return this.http.get<Summary>('/api/analytics/summary').pipe(
-      tap(data => {
-        this._summary.set(data);
-        this._loading.set(false);
-      }),
-      catchError(err => {
-        this._loading.set(false);
-        throw err;
-      })
-    );
-  }
-}
-```
+## Progressive Signal Chain Pattern
 
-**Component usage:**
-```typescript
-@Component({...})
-export class DashboardComponent {
-  private analytics = inject(AnalyticsService);
-  summary = this.analytics.summary;
-  loading = this.analytics.loading;
-}
-```
+For data transformation in presentational components, chaining computed signals with single responsibility keeps logic clean: `input → filtered → transformed → derived metrics`. Downstream signals derive from the filtered signal (not raw input), ensuring filter logic applies exactly once. This pattern naturally emerges in components displaying categorized, aggregated, or excluded data.
 
-**Pattern:** Matches AuthService pattern for consistency across services.
+See `reference.md` for the Multi-Entity Page Pattern, CanDeactivate Guard Patterns, HTTP Error Handling Ownership, Debounced Signal-to-Iframe Preview, zoneless change detection, dependency injection, HTTP client patterns, Resource API, component libraries comparison (PrimeNG, Kendo, Angular Material), reactive forms, router patterns, and error handling.
 
-See `examples.md` for full testing code patterns.
-
-See `reference.md` for component libraries.
+See `examples.md` for dashboard metrics component, data table with filtering, authentication service, WebSocket service, and signal testing patterns (PLATFORM_ID mocking, WritableSignal, NG0100 prevention).

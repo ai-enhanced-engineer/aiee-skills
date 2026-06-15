@@ -1,7 +1,9 @@
 ---
 name: frontend-angular-ai
 description: AI integration patterns for Angular applications using Genkit, Firebase AI Logic, or Gemini API. Includes streaming responses, tool calling, and RAG patterns. Use when building AI-powered features in Angular apps.
-trigger-terms: Genkit, Firebase AI Logic, Gemini API, Angular AI integration, streaming responses
+kb-sources:
+  - wiki/software-engineering/angular-ai-tools
+updated: 2026-05-21
 ---
 
 # Angular AI Integration

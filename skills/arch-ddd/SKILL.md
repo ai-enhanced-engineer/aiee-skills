@@ -2,6 +2,9 @@
 name: arch-ddd
 description: Tactical DDD patterns for clean Python architecture including Domain Model, Repository, Service Layer, Unit of Work, and Aggregates. Use for backend architecture decisions, implementing data access layers, separating business logic from infrastructure, or reviewing code separation.
 allowed-tools: Read, Grep, Glob
+kb-sources:
+  - wiki/software-engineering/arch-ddd
+updated: 2026-06-15
 ---
 
 # Domain-Driven Architecture
@@ -47,8 +50,8 @@ Atomic operations and transaction lifecycle management.
 Consistency boundaries - clusters of objects that must remain consistent together.
 
 - One aggregate = one repository
-- Modify one aggregate per transaction
-- Reference others by ID only
+- Modify one aggregate per transaction — spanning several in one transaction couples their consistency boundaries and complicates rollback
+- Reference other aggregates by ID, not object reference — cross-boundary object references trigger unintended cascade loads
 
 ## The Dependency Rule
 
@@ -84,10 +87,16 @@ When deciding where to place new features, domain ownership typically outweighs 
 **Example:**
 | Option | Domain | Data | Infrastructure | Decision |
 |--------|--------|------|----------------|----------|
-| gateway-service | ❌ (real-time) | ❌ | ✅ (has DB) | Reject |
-| migrations-service | ❌ (schemas) | ❌ | ✅ (has batch) | Reject |
-| analytics-service | ✅ (analytics) | ✅ (owns data) | ❌ (needs new) | **Accept** |
+| gateway-service | No (real-time) | No | Yes (has DB) | Reject |
+| migrations-service | No (schemas) | No | Yes (has batch) | Reject |
+| analytics-service | Yes (analytics) | Yes (owns data) | No (needs new) | **Accept** |
 
 **Trade-off:** Infrastructure setup is one-time cost; wrong service boundaries compound over time.
+
+## Aggregate Write Boundaries — Client Side
+
+Splitting an aggregate root + children across two requests re-introduces the failure class the boundary prevents: failed child → orphaned parent; retry without checking → duplicate parent. Prefer the single transactional nested-create endpoint. Verify the contract exists before assuming split endpoints are required; a retry id-guard treats the symptom, not the disease.
+
+See `reference.md` § "Aggregate Write Boundaries — Client Side" for failure modes and retry-guard analysis. See `arch-decision-records` § "API Consumption Patterns" for the client-side consumption rule.
 
 See `reference.md` for detailed explanations and `examples.md` for implementations.

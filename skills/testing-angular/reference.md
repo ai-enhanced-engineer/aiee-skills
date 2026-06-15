@@ -178,6 +178,37 @@ TestBed.configureTestingModule({
 });
 ```
 
+## Async Testing
+
+### Using fakeAsync
+
+```typescript
+it('should debounce search', fakeAsync(() => {
+  const fixture = TestBed.createComponent(SearchComponent);
+
+  fixture.componentInstance.searchTerm.set('ang');
+  tick(100); // Not enough time
+  expect(fixture.componentInstance.results()).toEqual([]);
+
+  tick(200); // Total 300ms, debounce triggers
+  TestBed.flushEffects();
+  expect(fixture.componentInstance.results().length).toBeGreaterThan(0);
+}));
+```
+
+### Using waitForAsync
+
+```typescript
+it('should load data on init', waitForAsync(async () => {
+  const fixture = TestBed.createComponent(DataComponent);
+  fixture.detectChanges();
+
+  await fixture.whenStable();
+
+  expect(fixture.componentInstance.data()).toBeDefined();
+}));
+```
+
 ## Playwright E2E Setup
 
 ```typescript

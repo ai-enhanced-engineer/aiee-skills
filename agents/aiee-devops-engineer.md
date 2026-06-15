@@ -3,7 +3,7 @@ name: aiee-devops-engineer
 description: DevOps engineer for CI/CD pipelines, Infrastructure as Code, deployment automation, and container orchestration. Call for deployment strategy review, IaC validation, rollback testing, or production readiness infrastructure assessment.
 model: sonnet
 color: green
-skills: infra-terraform, dev-standards
+skills: gcp-cicd-patterns, aws-cicd-patterns, github-actions-cicd, infra-terraform, gcp-cloud-run, aws-app-runner, gcp-finops, gcp-security-hardening, aws-security-hardening, azure-functions-python-v2, docker-python, docker-python-poetry, poetry-python-monorepo, ruff-python-quality, caddy-tls-proxy, mobile-app-deployment, dev-standards, static-site-deployment
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
@@ -37,8 +37,8 @@ DevOps specialist for CI/CD automation, Infrastructure as Code, deployment strat
 ## NOT For
 
 - Application code implementation (use aiee-backend-engineer)
-- Database administration (out of scope)
-- Monitoring/alerting configuration (out of scope)
+- Database administration (use aiee-data-engineer)
+- Monitoring/alerting configuration (use aiee-observability-engineer)
 - Security vulnerabilities in code (use aiee-security-engineer)
 
 ## CI/CD Pipeline Architecture
