@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/ai-enhanced-engineer/aiee-team/compare/v1.3.1...v1.4.0) (2026-06-16)
+
+
+### Features
+
+* publish aiee pack (11 agents, 102 generalizable skills) ([#10](https://github.com/ai-enhanced-engineer/aiee-team/issues/10)) ([d4e4732](https://github.com/ai-enhanced-engineer/aiee-team/commit/d4e4732dab3b65e60a7b6e6ac653f75c6d10b688))
+
 ## [1.3.1](https://github.com/ai-enhanced-engineer/aiee-team/compare/v1.3.0...v1.3.1) (2026-02-06)
 
 
