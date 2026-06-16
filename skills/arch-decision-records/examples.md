@@ -117,7 +117,8 @@ We will use PostgreSQL as our primary database, leveraging:
 
 ## References
 
-- [PostgreSQL JSONB Documentation](https://www.postgresql.org/docs/current/datatype-json.html)
+- [Research: Database Selection](context/research/database-selection-deep.md)
+- [PostgreSQL JSONB Performance](https://www.postgresql.org/docs/current/datatype-json.html)
 ```
 
 ---
@@ -138,6 +139,7 @@ Order processing involves multiple downstream actions:
 - Payment processing
 - Notification sending
 - Analytics tracking
+- Shipping initiation
 
 Current synchronous approach causes:
 - Long response times (user waits for all operations)
@@ -182,5 +184,155 @@ We will adopt an event-driven architecture for order processing:
 
 ## References
 
+- [Research: Event-Driven Patterns](context/research/event-architecture-deep.md)
 - ADR-001 (database choice affects event storage)
+```
+
+---
+
+## Example: Integration Approach ADR
+
+```markdown
+# ADR-003: Use Stripe for Payment Processing
+
+**Status**: Accepted
+**Date**: 2024-02-01
+**Deciders**: Alice (Tech Lead), Eve (Product), Finance Team
+
+## Context
+
+We need to accept payments for our e-commerce platform:
+- Credit/debit cards (primary)
+- Support for subscriptions (future)
+- PCI compliance required
+- International customers (multi-currency)
+
+Budget: Up to 3% transaction fee acceptable
+Timeline: MVP in 4 weeks
+
+## Decision
+
+We will use Stripe as our payment processor:
+- Stripe Elements for card input (PCI compliance handled)
+- Payment Intents API for transactions
+- Webhooks for async payment confirmations
+
+## Consequences
+
+### Positive
+- PCI compliance handled by Stripe (SAQ-A eligible)
+- Excellent developer experience and documentation
+- Built-in fraud detection
+- Easy subscription addition later
+
+### Negative
+- 2.9% + $0.30 per transaction (higher than some alternatives)
+- Vendor lock-in for payment logic
+- Payout delay (2 business days)
+
+### Neutral
+- Need webhook endpoint for payment confirmations
+- Test mode available for development
+
+## Alternatives Considered
+
+### Adyen
+- Pros: Lower fees at volume, more payment methods
+- Cons: More complex integration, enterprise-focused
+- Why rejected: Overkill for MVP, revisit at $1M+ GMV
+
+### Square
+- Pros: Good for in-person + online
+- Cons: Less developer-friendly API, limited international
+- Why rejected: We're online-only, need global support
+
+### Build with Payment Gateway
+- Pros: Lowest fees, full control
+- Cons: PCI compliance burden, 3-6 month implementation
+- Why rejected: Timeline and compliance risk
+
+## References
+
+- [Stripe Documentation](https://stripe.com/docs)
+- [PCI Compliance Guide](context/research/pci-compliance.md)
+```
+
+---
+
+## Full ADR.md File Example
+
+For projects using a single file:
+
+```markdown
+# Architecture Decision Records
+
+This document captures architecturally significant decisions for the Document Processing API project.
+
+---
+
+## ADR-001: Use FastAPI as Web Framework
+
+**Status**: Accepted
+**Date**: 2024-01-15
+
+### Context
+We need a Python web framework for our REST API. Requirements:
+- Async support for I/O-bound PDF processing
+- Automatic OpenAPI documentation
+- Type hints integration
+- Team familiar with Python
+
+### Decision
+We will use FastAPI as our web framework.
+
+### Consequences
+- **Positive**: Native async, automatic docs, Pydantic integration
+- **Negative**: Smaller community than Flask/Django
+- **Neutral**: Requires Python 3.8+
+
+### References
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+
+---
+
+## ADR-002: Use PyMuPDF for PDF Processing
+
+**Status**: Accepted
+**Date**: 2024-01-16
+
+### Context
+We need to extract text from PDF files. Options include PyMuPDF, pdfplumber, PyPDF2.
+
+### Decision
+We will use PyMuPDF (fitz) for PDF text extraction.
+
+### Consequences
+- **Positive**: Fastest option, handles complex layouts well
+- **Negative**: GPL license (acceptable for our use case)
+- **Neutral**: Requires system dependencies
+
+### References
+- [PyMuPDF Benchmarks](context/research/pdf-libraries.md)
+
+---
+
+## ADR-003: Use Qdrant for Vector Storage
+
+**Status**: Accepted
+**Date**: 2024-01-20
+
+### Context
+Need vector database for semantic search over extracted document content.
+
+### Decision
+We will use Qdrant for vector storage with text-embedding-3-small embeddings.
+
+### Consequences
+- **Positive**: Easy local development, good filtering, Rust performance
+- **Negative**: Less mature than Pinecone
+- **Neutral**: Can self-host or use cloud
+
+### References
+- ADR-002 (text extraction feeds into embeddings)
+- [Research: Vector Databases](context/research/vector-db-comparison.md)
 ```

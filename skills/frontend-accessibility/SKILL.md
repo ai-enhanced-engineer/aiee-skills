@@ -1,7 +1,9 @@
 ---
 name: frontend-accessibility
-description: Web accessibility patterns for WCAG 2.1 AA compliance including ARIA, keyboard navigation, screen reader support, and Angular and framework-agnostic implementations. Use for accessibility audits, a11y implementation, or inclusive design.
-trigger-terms: accessibility audit, a11y, WCAG 2.1, keyboard navigation, screen reader, ARIA, accessible components, inclusive design, ADA compliance
+description: Web accessibility patterns for WCAG 2.1 AA compliance including ARIA, keyboard navigation, screen reader support, contrast ratios, touch targets, design-token contrast safety, and Svelte-specific implementations. Use for accessibility audits, a11y implementation, ADA compliance, or inclusive design.
+kb-sources:
+  - wiki/software-engineering/frontend-accessibility
+updated: 2026-06-15
 allowed-tools: Read, Grep, Glob
 ---
 
@@ -18,134 +20,71 @@ WCAG 2.1 AA compliance patterns for modern web applications.
 | **Understandable** | Information and operation understandable |
 | **Robust** | Works with current and future technologies |
 
-## Quick Reference
+## Keyboard Navigation
 
-### Keyboard Navigation
 - **Tab/Shift+Tab**: Navigate interactive elements
 - **Enter/Space**: Activate buttons/links
 - **Escape**: Close modals/dropdowns
 - **Arrow keys**: Navigate lists/menus
 
-### Color Contrast (WCAG AA)
+## Color Contrast (WCAG AA)
+
 - Normal text: **4.5:1** minimum
 - Large text (18pt+): **3:1** minimum
 - Interactive elements: **3:1** minimum
 
-**Common Adjustments** (maintain hue, reduce HSL lightness ~20%):
+Common fix: maintain hue, reduce HSL lightness ~20% (e.g. `#ef4444` → `#c53030`). See `reference.md → Color Contrast` for the safe-combinations table and dark-mode re-validation guidance.
 
-| Original | Fixed | Use Case | Contrast |
-|----------|-------|----------|----------|
-| `#ef4444` | `#c53030` | Error red | 4.5:1 ✅ |
-| `#f59e0b` | `#b45309` | Warning orange | 4.5:1 ✅ |
-| `#10b981` | `#047857` | Success green | 4.5:1 ✅ |
-| `#3b82f6` | `#1d4ed8` | Info blue | 4.5:1 ✅ |
+## Focus Management
 
-**Rule**: For status colors on white background, check contrast at [webaim.org/resources/contrastchecker](https://webaim.org/resources/contrastchecker/)
-
-### ARIA Essentials
-
-```html
-<!-- Landmarks -->
-<header role="banner">
-<nav role="navigation" aria-label="Main">
-<main role="main">
-<footer role="contentinfo">
-
-<!-- Live regions (for dynamic content like chat) -->
-<div role="status" aria-live="polite" aria-atomic="true">
-  <!-- Screen reader announces changes -->
-</div>
-
-<!-- Accessible buttons -->
-<button aria-label="Close dialog" aria-pressed="false">
-```
-
-### Focus Management
-- Visible focus indicators (never `outline: none` without alternative)
-- Trap focus in modals
-- Return focus on modal close
+- Visible focus indicators (`outline: none` without alternative removes keyboard discoverability)
+- Use `:focus-visible` over `:focus` — only shows for keyboard navigation
+- Trap focus in modals, return focus on close
 - Manage focus on route changes
 
-### Common Mistakes
+## Motion and Animation
+
+CSS animations include `prefers-reduced-motion` overrides (WCAG 2.1 AAA criterion 2.3.3 — vestibular disorder risk).
+
+## Touch Targets
+
+WCAG 2.5.5 requires interactive elements to have `min-width: 44px; min-height: 44px`. Common violations: `.btn-sm` (36px), `.btn-icon` (28px), `.copy-btn` (32px). Padding alone can produce heights under 44px (e.g., `padding: 0.625rem` = ~42.5px) — explicit `min-height: 44px` prevents the under-44px result.
+
+## Name, Role, Value (WCAG 4.1.2) — Conditional Role
+
+Apply a landmark or group `role` only when an accessible name is present. `role={label ? "group" : undefined}` — a `role` with `aria-labelledby={undefined}` exposes a nameless region that adds nothing to the a11y tree and can mislead AT users.
+
+**Testable touch-target contract**: stamp `data-wcag-touch-target="44"` on sized elements so unit tests assert WCAG intent without computing layout (jsdom cannot measure rendered size). Test: `expect(el).toHaveAttribute('data-wcag-touch-target', '44')`.
+
+See `reference.md` → *Conditional Role and Testable Contract* for code examples and axe-core rule details.
+
+## Design Token Contrast Safety
+
+`var(--text-muted)` (~4.48:1 at `#718096`) lands under WCAG AA's 4.5:1 minimum for body copy below 18px — not safe to default for body text; `var(--text-secondary)` (~7:1) is safe for all sizes. Without a paired override, body text on a dark section fails WCAG AA 4.5:1 contrast.
+
+See `reference.md` → *Design Token Contrast Safety* for the full contrast-ratio table and the dark-section override pattern.
+
+## Checklists
+
+Pre-flight CSS (token validation, contrast, hover-affordance) and pre-placement audit (section rhythm, card-variant reuse, token palette) — see `reference.md` → *Pre-Flight CSS Checklist* and *Pre-Placement Audit* for the full checklists.
+
+## Stretched-Link Cards (Single Tab Stop)
+
+A card with both a title link and a "read more" link creates two tab stops for one destination. Collapse to one via `::after` overlay on the title link; render "read more" as `aria-hidden="true"` `<span>`. See `reference.md → Stretched-Link Cards` for the CSS pattern and Playwright pointer-interception verification.
+
+## Common Mistakes
+
 - Missing `alt` on images
 - Form inputs without labels
 - Color as only indicator
 - Mouse-only interactions
 - Missing skip links
 - Auto-playing media
-- Conflicting visual states (e.g., "featured" and "selected" both using same visual indicator—use distinct patterns)
+- Conflicting visual states (e.g., "featured" and "selected" using same indicator)
+- `.sr-only` defined per-component instead of global styles
 
-### Interactive Component Accessibility Checklist
+See `reference.md → Common Mistakes — Extended` for Retina 2x source-size and `<dt>`/`<dd>` ordering items.
 
-For custom interactive components (tabs, accordions, selectors, toggles):
+See `reference.md` for the Interactive Component Checklist, full WCAG 2.1 AA criteria tables, testing tools, ARIA roles reference, Shadow DOM accessibility, and dark mode contrast details.
 
-- [ ] **ARIA markup** - Correct role, aria-checked/selected/expanded
-- [ ] **JavaScript announcements** - aria-live regions for state changes
-- [ ] **Keyboard navigation** - Tab, Enter/Space, Arrow keys
-- [ ] **Visual states** - Clear focus/selected/disabled indicators
-- [ ] **Focus management** - Logical flow, no focus traps
-
-## Progressive Disclosure with Native HTML
-
-Use native `<details>` elements instead of custom JavaScript accordions:
-
-```html
-<details class="expandable-section">
-  <summary>
-    <h3>Section Title</h3>
-    <span class="chevron" aria-hidden="true">▼</span>
-  </summary>
-  <div class="expanded-content">
-    <!-- Content here -->
-  </div>
-</details>
-```
-
-```css
-details summary {
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-
-details summary::-webkit-details-marker {
-  display: none;
-}
-
-details[open] .chevron {
-  transform: rotate(180deg);
-}
-
-details summary:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-```
-
-**Benefits:**
-- Built-in keyboard navigation (Tab, Enter/Space to toggle)
-- Screen readers announce "collapsed/expanded" state automatically
-- Works without JavaScript
-- Less code to maintain
-
-**When to use:** FAQs, expandable cards, skill lists, workflow phases, any progressive disclosure pattern
-
-## Decorative Elements with Text Alternatives
-
-For visual flow indicators (arrows, connectors):
-
-```html
-<!-- Visual arrows (hidden from screen readers) -->
-<div class="flow-arrow" aria-hidden="true">...</div>
-
-<!-- Text alternative for screen readers and mobile -->
-<p class="flow-description">
-  After Phase 5, teams iterate back to Phase 1 (max 3 cycles).
-</p>
-```
-
-**Responsive strategy:**
-- Desktop (1024px+): Show visual arrows, hide text description
-- Mobile/tablet: Hide arrows, show text description
-
-See `reference.md` for WCAG criteria and `examples.md` for Angular implementations.
+See `examples.md` for Svelte 5 accessible components (button, modal, form input, chat message list, typing indicator, connection status, skip link, focus trap utility, Web Component a11y), progressive disclosure HTML/CSS, and decorative element patterns.

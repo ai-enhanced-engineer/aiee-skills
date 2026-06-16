@@ -57,6 +57,36 @@ app.post('/api/chat', async (req, res) => {
 app.listen(3000);
 ```
 
+### Tool Calling (Function Calling)
+
+```typescript
+import { defineTool } from 'genkit';
+
+// Define a tool
+const searchProducts = defineTool({
+  name: 'searchProducts',
+  description: 'Search the product catalog by query',
+  inputSchema: z.object({
+    query: z.string(),
+    category: z.string().optional()
+  }),
+  outputSchema: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    price: z.number()
+  }))
+}, async ({ query, category }) => {
+  // Actual search implementation
+  return await productService.search(query, category);
+});
+
+// Use in generation
+const response = await ai.generate({
+  prompt: 'Find me a laptop under $1000',
+  tools: [searchProducts]
+});
+```
+
 ### Streaming with Genkit
 
 ```typescript
@@ -179,6 +209,69 @@ export class GeminiService {
     }
   }
 }
+```
+
+## Resource API for AI Data
+
+Angular's Resource API handles async AI data elegantly.
+
+```typescript
+@Component({...})
+export class InsightsComponent {
+  private aiService = inject(AIService);
+
+  metricsData = input.required<Metrics>();
+
+  // AI insights as a resource
+  insights = resource({
+    request: () => ({ metrics: this.metricsData() }),
+    loader: async ({ request }) => {
+      return this.aiService.generateInsights(request.metrics);
+    }
+  });
+
+  template = `
+    @if (insights.isLoading()) {
+      <app-skeleton />
+    }
+
+    @if (insights.hasValue()) {
+      <div class="insights">{{ insights.value() }}</div>
+    }
+
+    @if (insights.error()) {
+      <app-error [message]="insights.error().message" />
+    }
+  `;
+}
+```
+
+## RAG Pattern (Retrieval-Augmented Generation)
+
+```typescript
+// Server-side RAG with Genkit
+import { retrieve } from 'genkit';
+
+app.post('/api/rag', async (req, res) => {
+  const { question } = req.body;
+
+  // 1. Retrieve relevant documents
+  const docs = await vectorStore.search(question, { limit: 5 });
+
+  // 2. Build context
+  const context = docs.map(d => d.content).join('\n\n');
+
+  // 3. Generate with context
+  const response = await ai.generate({
+    prompt: `Context:\n${context}\n\nQuestion: ${question}\n\nAnswer:`,
+    config: { temperature: 0.3 } // Lower for factual
+  });
+
+  res.json({
+    answer: response.text,
+    sources: docs.map(d => d.metadata.source)
+  });
+});
 ```
 
 ## Security Patterns

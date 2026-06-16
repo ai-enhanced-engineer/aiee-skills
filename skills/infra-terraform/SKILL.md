@@ -1,6 +1,9 @@
 ---
 name: infra-terraform
 description: Modern Terraform patterns for module design, state management, and CI/CD integration. Use for structuring Terraform projects, managing remote state, implementing environment separation, or enforcing code quality.
+kb-sources:
+  - wiki/software-engineering/infra-terraform
+updated: 2026-05-21
 ---
 
 # Terraform Patterns
@@ -14,25 +17,14 @@ Modern Infrastructure as Code patterns for Terraform, emphasizing modularity, sa
 | **Treat as code** | Version control, code review, CI/CD |
 | **Don't Repeat Yourself** | Modules for reusable patterns |
 | **Explicit > Implicit** | tfvars over workspaces, directories over conditionals |
-| **Plan before apply** | Always review terraform plan |
-| **Remote state** | Never local state in production |
+| **Plan before apply** | Review terraform plan before apply |
+| **Remote state** | Remote state for production environments |
 
 **Note:** HashiCorp changed Terraform license (BSL). OpenTofu is the community MPL-2.0 fork.
 
 ## Standard Module Structure
 
-```
-modules/
-└── cloud-sql/
-    ├── main.tf          # Resources
-    ├── variables.tf     # Inputs with validation
-    ├── outputs.tf       # Outputs for other modules
-    ├── versions.tf      # Provider constraints
-    ├── README.md        # Documentation
-    └── examples/
-        └── basic/
-            └── main.tf  # Usage example
-```
+Standard module: `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, `README.md` + `examples/`. See `reference.md` for full directory tree.
 
 ### Design Guidelines
 
@@ -42,66 +34,9 @@ modules/
 4. **Explicit outputs** - Clear contract
 5. **Semantic versioning** - Tag releases
 
-## Environment Separation
-
-### Recommended: Directory per Environment
-
-```
-environments/
-├── staging/
-│   ├── main.tf
-│   ├── terraform.tfvars
-│   └── backend.tf
-└── production/
-    ├── main.tf
-    ├── terraform.tfvars
-    └── backend.tf
-```
-
-**Why:** Complete isolation, separate state, clear boundaries
-
-### Alternative: tfvars Files
-
-```
-terraform/
-├── main.tf
-├── variables.tf
-└── environments/
-    ├── staging.tfvars
-    └── production.tfvars
-
-# Usage
-terraform plan -var-file=environments/staging.tfvars
-```
-
-**Why:** Less duplication when environments are similar
-
-### Avoid: Workspaces for Environments
-
-Workspaces share code, making it easy to apply wrong config.
-
 ## State Management
 
-### Remote Backend (Required)
-
-```hcl
-terraform {
-  backend "gcs" {
-    bucket = "my-terraform-state"
-    prefix = "terraform/state"
-  }
-}
-```
-
-### State Safety
-
-- **Enable versioning** - Recover from corruption
-- **Enable locking** - Prevent concurrent modifications
-- **Encrypt at rest** - State contains secrets
-- **Restrict access** - IAM for state bucket
-- **Never edit manually** - Use `terraform state` commands
-
-### Handling State Issues
+Remote backend required. Enable versioning, locking, encryption, and IAM access control.
 
 | Issue | Solution |
 |-------|----------|
@@ -110,37 +45,64 @@ terraform {
 | Import needed | `terraform import <resource> <id>` |
 | State corruption | Restore from versioned backup |
 
-## CI/CD Integration
+## EC2 Import Workflow
 
-### Pipeline Stages
+Two-phase approach: achieve **zero-diff** on import first, then apply intentional changes (hardening) as a separate plan/apply.
 
-```yaml
-stages:
-  - validate    # fmt, validate
-  - plan        # terraform plan
-  - approve     # manual gate (production)
-  - apply       # terraform apply
-```
+### Pre-Import Reconnaissance
 
-### Pre-commit Hooks
+Best practice: capture ground truth via `describe-instances`, `describe-volumes`, and `describe-addresses` before writing HCL. See `examples.md` for the full reconnaissance command set.
 
-```yaml
-# .pre-commit-config.yaml
-repos:
-  - repo: https://github.com/antonbabenko/pre-commit-terraform
-    hooks:
-      - id: terraform_fmt
-      - id: terraform_validate
-      - id: terraform_tflint
-      - id: terraform_docs
-```
+### Drift-Prone Attributes (t2/t3)
+
+Missing these causes perpetual plan drift: `credit_specification`, `monitoring`, `ebs_optimized`, `root_block_device.throughput`, `root_block_device.iops`.
+
+### Import Gotchas
+
+- **AMI**: Pin as literal string, not `data.aws_ami` — data source may resolve to a different AMI, triggering instance replacement (`ami` is ForceNew)
+- **EIP association**: Import uses the association ID (`eipassoc-*`), not the allocation ID — retrieve via `describe-addresses --query 'Addresses[0].AssociationId'`
+- **SG rename**: AWS SG names are immutable — renaming triggers destroy+recreate. Use `lifecycle { create_before_destroy = true }` to avoid traffic gaps
+- **State cleanup**: Before removing `.tf` files, run `terraform state rm` or `terraform destroy -target` for each managed resource to prevent orphans
+
+## Pre-Apply Discovery
+
+Accounts with prior manual provisioning may have resources that conflict with Terraform-managed equivalents. Running recon before the first apply surfaces these — see `examples.md` for pre-apply recon commands.
+
+**Import-then-harden workflow**: recon live state → match HCL to exact live attributes → `terraform import` → plan (verify zero-diff) → add intentional changes → apply.
+
+`data` sources reference existing account-wide singletons (OIDC providers) without claiming ownership. `resource` blocks claim ownership — if the singleton already exists, the apply fails. See `aws-security-hardening` skill for OIDC provider details.
+
+## ECR Configuration
+
+`image_tag_mutability = "MUTABLE"` accommodates pipelines that push `:latest` on every deploy — IMMUTABLE rejects the second push silently. SHA tags still provide traceability. ECR lifecycle policies prune orphaned layers accumulated from MUTABLE tag overwrites.
+
+## Gate Selection for Non-Terraform Infrastructure
+
+The `plan-cost` quality gate assumes infrastructure = Terraform. For shell scripts, systemd units, and CI/CD changes classified under "infrastructure" in `aiee/project.yaml`, fall back to `test-enforcement` or peer review when no `.tf` files are changed.
+
+## Anti-Patterns
+
+| Anti-Pattern | Pattern |
+|--------------|---------|
+| Deployment YAMLs in infrastructure repo | Keep in service repo, reference via handoff doc |
+| Templates mixed with live Terraform | Move to `docs/deployment-templates/` as reference only |
+| Static SPA SA in shared `cloud_run_service_accounts` map | Grant only `logging.logWriter` + `artifactregistry.writer` directly (see `gcp-security-hardening` skill) |
+| Workspaces for environment separation | Directory per environment or tfvars files |
+| Write code first, then import existing resources | Import to state first, then write matching code |
+| IAM `for_each` block not audited when service gains new dependency | Cross-reference ALL secrets in staging YAML against service's IAM `*_secrets` block On every deploy |
+| Claiming Terraform output is a blocker without checking deploy mechanism | Read the actual deploy pipeline to verify how values are consumed before declaring outputs missing |
+| Assuming greenfield on accounts with history | Run pre-apply recon commands before first apply |
+| Using `resource` for OIDC provider without checking existence | `data` source by default; see `aws-security-hardening` for OIDC provider details |
+| `image_tag_mutability = "IMMUTABLE"` with `:latest` push strategy | Use `MUTABLE` if pipeline pushes `:latest`; SHA tags provide traceability |
+| `plan-cost` gate on non-Terraform infrastructure changes | Fall back to `test-enforcement` or peer review for shell/systemd/CI changes |
 
 ## Critical Rules
 
-1. **Never store secrets in tfvars** - Use Secret Manager, reference dynamically
-2. **Lock provider versions** - Commit `.terraform.lock.hcl`
-3. **Review every plan** - Especially destroys
-4. **Tag module versions** - `?ref=v1.2.3`
-5. **Plan in CI** - Detect drift early
+1. **Secrets in tfvars get committed to VCS and leak on any repo clone** — store them in Secret Manager and reference dynamically.
+2. **Unlocked provider versions resolve to different releases across machines** — commit `.terraform.lock.hcl` so every run is deterministic.
+3. **Unreviewed plans destroy production resources without warning** — read every plan output, especially lines prefixed with `-`.
+4. **Untagged module references (`?ref=main`) pull breaking changes silently** — pin with `?ref=v1.2.3` and treat upgrades as explicit decisions.
+5. **Drift discovered at apply time means a human is in the loop under pressure** — running `plan` in CI surfaces drift before it becomes an incident.
+See `reference.md` for environment separation patterns, state safety, state lock prevention, zero-downtime migration, IAM binding placement, deployment process, cross-repo secret validation, and multi-phase ticket validation.
 
-See `reference.md` for detailed patterns and `examples.md` for a complete module example.
+See `examples.md` for complete module examples, CI/CD pipelines, Makefile patterns, and pre-commit configuration.

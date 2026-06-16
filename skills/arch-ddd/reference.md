@@ -59,6 +59,20 @@ class UserEntity:
 - Thread-safe by default
 - Easy to test (no hidden state changes)
 
+**Pattern Structure:**
+- Entity declared with `frozen=True`
+- Each mutable concern has a `with_{field}()` method
+- Methods use `dataclasses.replace()` to create new instances
+- New instance returned; original never modified
+
+**Usage in Services:**
+```python
+# Service layer uses with_* methods
+def record_login(self, db: DomainSession, user: UserEntity) -> UserEntity:
+    updated_user = user.with_last_login(datetime.now(timezone.utc))
+    return self.user_repo.update(db, updated_user)
+```
+
 ## Repository Pattern (Deep Dive)
 
 ### Interface Design
@@ -107,6 +121,18 @@ class AbstractRepository(ABC):
 - Data access logic (belongs in repository)
 - HTTP/CLI concerns (belongs in entrypoints)
 
+### Service Function vs Service Class
+
+**Functions** (preferred for simple cases):
+- Stateless
+- Easy to test
+- Clear dependencies via parameters
+
+**Classes** (when needed):
+- Multiple related operations
+- Shared configuration
+- Complex dependency injection
+
 ## Unit of Work Pattern (Deep Dive)
 
 ### Context Manager Implementation
@@ -139,3 +165,77 @@ Ask these questions:
 2. **External References**: Other aggregates reference by ID only
 3. **Single Transaction**: Only modify one aggregate per transaction
 4. **Cascade Deletes**: Deleting root deletes all contained entities
+
+### Version Numbers
+
+Use version numbers for optimistic concurrency:
+- Increment on each modification
+- Check version before update
+- Raise conflict error if changed
+
+## Incremental Adoption
+
+### Step 1: Start with Domain Model
+- Move business logic into entity methods
+- Create value objects for complex attributes
+- Write unit tests for domain logic
+
+### Step 2: Add Repository
+- Create abstract interface
+- Implement concrete repository
+- Create fake for testing
+
+### Step 3: Introduce Service Layer
+- Extract orchestration from entrypoints
+- Define use case functions
+- Handle transactions
+
+### Step 4: Add Unit of Work
+- Wrap repository access
+- Manage transaction lifecycle
+- Enable atomic operations
+
+## Aggregate Write Boundaries — Client Side
+
+The aggregate pattern establishes a server-side transaction boundary: one Unit of Work, one aggregate, one commit. That boundary is undermined when the calling client splits the creation into multiple requests.
+
+### Why Two Requests Break the Guarantee
+
+A nested aggregate (parent root + child entities) created via two sequential requests produces three failure modes that the aggregate pattern is designed to prevent:
+
+**Orphan failure**: The parent-create succeeds and the child-create fails. The parent row now exists in the database referencing no children. Domain invariants are violated — but no exception was raised at the transaction level because each request committed its own micro-transaction independently.
+
+**Duplicate-on-retry**: The caller's retry logic re-issues the parent-create without checking whether the prior attempt committed. A second parent row appears. If the id is caller-generated, subsequent child-creates may write against the wrong id. If the id is server-generated, the caller has no way to know which parent id to use for the retried children.
+
+**Race condition under concurrent callers**: Two callers attempting the same parent-create simultaneously may both succeed if no uniqueness constraint covers the business key, or may produce a constraint error that the caller did not anticipate because the endpoint contract implied idempotency.
+
+### The Correct Pattern
+
+The backend exposes a single nested-create endpoint that wraps the full aggregate creation in one transaction. The client issues one request; if any part fails, the entire transaction rolls back — no orphan, no partial state, no duplicate.
+
+```python
+# Two-request form (wrong)
+parent = api.post("/widgets", {"name": "A"})       # committed independently
+api.post("/widgets/{id}/parts", {"qty": 3})        # if this fails, parent is orphaned
+
+# Nested-create form (correct)
+api.post("/widgets", {"name": "A", "parts": [{"qty": 3}]})  # one transaction
+```
+
+### Before Assuming Separate Endpoints Are Required
+
+Verify the contract:
+- Grep the route handler for the resource (`grep -r "POST.*widgets" app/`)
+- Check the request schema for a nested `parts` or `children` field
+- `curl -s <base>/openapi.json | jq '.paths."/widgets".post.requestBody'`
+
+If the nested-create endpoint exists but is undiscovered, using the two-request form is a client-side bug, not a missing backend feature.
+
+### When a Retry Guard Appears
+
+An id-guard (`if already_exists(id): skip`) on the retry path treats the symptom. The disease is the non-atomic split create. The guard:
+- Does not remove the orphan row from a prior partial failure
+- Does not handle the case where the parent id is server-generated and the caller doesn't know which to retry against
+- Adds branching logic that must be tested and maintained
+
+Replace the guard with the atomic endpoint. See `arch-decision-records` § "API Consumption Patterns" for the complementary client-side decision rule.

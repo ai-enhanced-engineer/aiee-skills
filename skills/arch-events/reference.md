@@ -106,6 +106,34 @@ def handle(message: Message, uow: AbstractUnitOfWork):
 
 **Events**: State change notifications, side effects, decoupling, eventual consistency
 
+## CQRS (Deep Dive)
+
+### The Problem
+
+Complex domain models optimized for writes make queries slow. CQRS separates these concerns.
+
+### Write Side (Command Model)
+
+Full domain model with rich behavior, validation, and transactional consistency.
+
+### Read Side (Query Model)
+
+Denormalized views optimized for fast retrieval, specific UI needs, and caching.
+
+### Keeping Read Models Updated
+
+Event handlers update read models when state changes:
+
+```python
+def update_allocations_view(event: Allocated, uow: AbstractUnitOfWork):
+    with uow:
+        uow.session.execute(
+            text("INSERT INTO allocations_view VALUES (:orderid, :sku, :batchref)"),
+            {"orderid": event.orderid, "sku": event.sku, "batchref": event.batchref}
+        )
+        uow.commit()
+```
+
 ## Bootstrap Pattern (Deep Dive)
 
 ### The Composition Root
@@ -140,3 +168,15 @@ def test_allocation():
     bus = bootstrap(start_orm=False, uow=FakeUnitOfWork())
     # Test with fakes
 ```
+
+## Validation Patterns
+
+### Three Layers
+
+1. **Syntax**: Is message well-formed? (Message classes, API edges)
+2. **Semantic**: Does it make sense? (Service layer - SKU exists?)
+3. **Pragmatic**: Can we do it? (Domain - sufficient stock?)
+
+### Tolerant Reader
+
+Accept input variations - extract only needed fields, ignore extras.

@@ -34,6 +34,15 @@ class Allocated(Event):
 class OutOfStock(Event):
     """Emitted when allocation fails due to insufficient stock."""
     sku: str
+
+
+@dataclass(frozen=True)
+class BatchCreated(Event):
+    """Emitted when a new batch is added to inventory."""
+    ref: str
+    sku: str
+    qty: int
+    eta: str | None = None
 ```
 
 ### Commands
@@ -54,6 +63,13 @@ class CreateBatch(Command):
     sku: str
     qty: int
     eta: str | None = None
+
+
+@dataclass(frozen=True)
+class ChangeBatchQuantity(Command):
+    """Request to adjust batch quantity."""
+    ref: str
+    qty: int
 ```
 
 ## Aggregate with Event Collection
@@ -85,6 +101,16 @@ class Product:
             # Emit event on failure
             self.events.append(OutOfStock(line.sku))
             raise OutOfStockError(f"Out of stock for sku {line.sku}")
+
+    def change_batch_quantity(self, ref: str, qty: int):
+        batch = next(b for b in self.batches if b.reference == ref)
+        batch._purchased_quantity = qty
+        while batch.available_quantity < 0:
+            line = batch.deallocate_one()
+            # Emit event for each deallocated line
+            self.events.append(
+                Deallocated(line.orderid, line.sku, line.qty)
+            )
 ```
 
 ## Message Bus Implementation
@@ -137,6 +163,21 @@ class MessageBus:
         return result
 ```
 
+### Handler Registration
+
+```python
+EVENT_HANDLERS: dict[type[Event], list[Callable]] = {
+    OutOfStock: [handlers.send_out_of_stock_notification],
+    Allocated: [handlers.publish_allocated_event, handlers.add_allocation_to_read_model],
+}
+
+COMMAND_HANDLERS: dict[type[Command], Callable] = {
+    Allocate: handlers.allocate,
+    CreateBatch: handlers.add_batch,
+    ChangeBatchQuantity: handlers.change_batch_quantity,
+}
+```
+
 ## Command and Event Handlers
 
 ### Command Handler
@@ -155,6 +196,18 @@ def allocate(cmd: Allocate, uow: AbstractUnitOfWork) -> str:
         uow.commit()
 
     return batchref
+
+
+def add_batch(cmd: CreateBatch, uow: AbstractUnitOfWork):
+    """Command handler for creating a batch."""
+    with uow:
+        product = uow.products.get(sku=cmd.sku)
+        if product is None:
+            product = Product(sku=cmd.sku, batches=[])
+            uow.products.add(product)
+
+        product.batches.append(Batch(cmd.ref, cmd.sku, cmd.qty, cmd.eta))
+        uow.commit()
 ```
 
 ### Event Handler
@@ -167,6 +220,113 @@ def send_out_of_stock_notification(event: OutOfStock, uow: AbstractUnitOfWork):
         subject=f"Out of stock: {event.sku}",
         body=f"The SKU {event.sku} is out of stock.",
     )
+
+
+def publish_allocated_event(event: Allocated, uow: AbstractUnitOfWork):
+    """Event handler - publish to external message broker."""
+    redis_client.publish("allocated", json.dumps(asdict(event)))
+```
+
+## Unit of Work with Event Collection
+
+```python
+class AbstractUnitOfWork(ABC):
+    products: AbstractProductRepository
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.rollback()
+
+    def collect_new_events(self):
+        """Yield events from all seen aggregates."""
+        for product in self.products.seen:
+            while product.events:
+                yield product.events.pop(0)
+
+    @abstractmethod
+    def commit(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def rollback(self):
+        raise NotImplementedError
+
+
+class TrackingRepository(AbstractProductRepository):
+    """Repository that tracks seen aggregates for event collection."""
+
+    def __init__(self, session: Session):
+        self.session = session
+        self.seen: set[Product] = set()
+
+    def add(self, product: Product):
+        self.seen.add(product)
+        self.session.add(product)
+
+    def get(self, sku: str) -> Product | None:
+        product = self.session.query(Product).filter_by(sku=sku).first()
+        if product:
+            self.seen.add(product)
+        return product
+```
+
+## CQRS Examples
+
+### Query Service (Read Side)
+
+```python
+from sqlalchemy import text
+
+
+def allocations_view(orderid: str, uow: AbstractUnitOfWork) -> list[dict]:
+    """Read model query - bypasses domain model entirely."""
+    with uow:
+        results = uow.session.execute(
+            text("SELECT sku, batchref FROM allocations_view WHERE orderid = :orderid"),
+            {"orderid": orderid},
+        )
+        return [{"sku": row.sku, "batchref": row.batchref} for row in results]
+
+
+def stock_view(sku: str, uow: AbstractUnitOfWork) -> dict:
+    """Read model for current stock levels."""
+    with uow:
+        result = uow.session.execute(
+            text("SELECT sku, available_qty FROM stock_view WHERE sku = :sku"),
+            {"sku": sku},
+        ).first()
+        return {"sku": result.sku, "available": result.available_qty} if result else None
+```
+
+### Event Handler Updating Read Model
+
+```python
+def add_allocation_to_read_model(event: Allocated, uow: AbstractUnitOfWork):
+    """Event handler that maintains denormalized read model."""
+    with uow:
+        uow.session.execute(
+            text(
+                "INSERT INTO allocations_view (orderid, sku, batchref) "
+                "VALUES (:orderid, :sku, :batchref)"
+            ),
+            {"orderid": event.orderid, "sku": event.sku, "batchref": event.batchref},
+        )
+        uow.commit()
+
+
+def remove_allocation_from_read_model(event: Deallocated, uow: AbstractUnitOfWork):
+    """Update read model when allocation is removed."""
+    with uow:
+        uow.session.execute(
+            text(
+                "DELETE FROM allocations_view "
+                "WHERE orderid = :orderid AND sku = :sku"
+            ),
+            {"orderid": event.orderid, "sku": event.sku},
+        )
+        uow.commit()
 ```
 
 ## Bootstrap Example
@@ -179,16 +339,21 @@ def bootstrap(
     start_orm: bool = True,
     uow: AbstractUnitOfWork | None = None,
     send_mail: Callable | None = None,
+    publish: Callable | None = None,
 ) -> MessageBus:
     """Composition root - wire all dependencies."""
     if start_orm:
         orm.start_mappers()
 
+    # Use provided dependencies or defaults
     uow = uow or SqlAlchemyUnitOfWork()
     send_mail = send_mail or email.send
+    publish = publish or redis_eventpublisher.publish
 
+    # Inject dependencies into handlers
     injected_event_handlers = {
         OutOfStock: [partial(handlers.send_out_of_stock_notification, send_mail=send_mail)],
+        Allocated: [partial(handlers.publish_allocated_event, publish=publish)],
     }
 
     injected_command_handlers = {
@@ -232,4 +397,24 @@ def test__out_of_stock__sends_notification():
 
     assert len(notifications) == 1
     assert "LAMP" in notifications[0]["subject"]
+```
+
+## External Event Consumer Example
+
+```python
+import json
+import redis
+
+
+def main():
+    """Entry point for external event consumer."""
+    bus = bootstrap()
+    pubsub = redis.Redis().pubsub()
+    pubsub.subscribe("batch_quantity_changed")
+
+    for message in pubsub.listen():
+        if message["type"] == "message":
+            data = json.loads(message["data"])
+            cmd = ChangeBatchQuantity(ref=data["ref"], qty=data["qty"])
+            bus.handle(cmd)
 ```

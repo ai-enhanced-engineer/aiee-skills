@@ -1,7 +1,9 @@
 ---
 name: testing-angular
-description: Angular 21+ testing patterns with Vitest, signal component testing, and Playwright E2E. Use for writing unit tests, integration tests, or E2E tests for Angular applications.
-trigger-terms: Angular testing, Vitest, Jasmine, Karma, Playwright E2E, signal testing
+description: Angular 21+ testing patterns with Vitest, signal component testing, and Playwright E2E. Use for writing unit tests, integration tests, or E2E tests for Angular applications, including Karma-to-Vitest migration.
+kb-sources:
+  - wiki/software-engineering/angular-testing
+updated: 2026-05-21
 ---
 
 # Angular Testing Patterns
@@ -61,7 +63,8 @@ describe('CounterComponent', () => {
 | `TestBed.flushEffects()` | Flush signal effects (NEW in v21) |
 | `fixture.detectChanges()` | Trigger change detection |
 | `fixture.whenStable()` | Wait for async operations |
-| `fakeAsync() / tick()` | Control time in tests |
+| `fakeAsync() / tick()` | Control time in tests (requires Zone.js — unavailable in zoneless) |
+| `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync()` | Zoneless time control (Vitest replacement for fakeAsync/tick) |
 
 ## Test File Naming
 
@@ -80,5 +83,21 @@ component.e2e.ts      # E2E tests (Playwright)
 | User interactions | Integration | Vitest + Testing Library |
 | Full user flows | E2E | Playwright |
 | Visual regression | E2E | Playwright screenshots |
+
+## Anti-Patterns
+
+| Anti-Pattern | Pattern |
+|--------------|---------|
+| `npx vitest run` directly on Angular projects using `@angular/build:unit-test` | `ng test --no-watch` initializes TestBed, resolves path aliases (`@core/`), and provides DOM APIs. Direct vitest invocation bypasses all of this. |
+| `// @vitest-environment jsdom` directive in Angular spec files | Omit entirely. Angular's test builder manages the environment. |
+| Hardcoded expected values derived from fixture data (e.g., `'53 questions'`) | Compute expected values programmatically from the same fixture: `mockData.reduce((s, q) => s + q.count, 0)`. Hardcoded values silently break when fixtures change for unrelated tests. |
+
+## Window Method Mocking
+
+When testing code that accesses `window` (e.g., `window.confirm` in guards), spy on the method with `vi.spyOn(window, 'confirm')` rather than replacing the global. Deleting `globalThis.window` in jsdom breaks cross-suite tests — `window` IS the global object itself, and removing it causes `window is not defined` errors in unrelated specs (e.g., Angular Forms' `DefaultValueAccessor`).
+
+See `examples.md` for the `vi.spyOn` window mocking pattern.
+
+For QA code-review, accessibility auditing, or validating AI-generated Angular code, use `qa-angular` instead.
 
 See `reference.md` for detailed patterns and `examples.md` for complete test suites.

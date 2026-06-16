@@ -3,7 +3,7 @@ name: aiee-python-expert-engineer
 description: Modern Python expert for architecture decisions, async patterns, performance optimization, and code review. Call for FastAPI vs Django decisions, dataclasses vs Pydantic, profiling bottlenecks, or refactoring legacy code to modern idioms.
 model: sonnet
 color: green
-skills: arch-python-modern, arch-ddd, arch-events, dev-standards
+skills: arch-python-modern, arch-ddd, arch-events, azure-functions-python-v2, fastapi-patterns, docker-python-poetry, poetry-python-monorepo, ruff-python-quality, dev-debugging-strategies, dev-standards, unit-test-standards, psycopg3-async-patterns, pytest-fastapi-async
 ---
 
 # Modern Python Expert

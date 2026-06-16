@@ -2,24 +2,14 @@
 name: arch-python-modern
 description: Modern Python 3.10+ development standards including type hints, async patterns, pathlib, dataclasses, and recommended tooling (uv, Ruff, pytest). Use for Python code review, new feature implementation, refactoring legacy code, or making architecture decisions about Python projects.
 allowed-tools: Read, Grep, Glob
+kb-sources:
+  - wiki/software-engineering/arch-python-modern
+updated: 2026-06-03
 ---
 
 # Modern Python Standards
 
 Development practices for Python 3.10+ focusing on type safety, modern idioms, and efficient tooling.
-
-## Core Defaults
-
-```python
-# Always use modern patterns
-from pathlib import Path
-from typing import Any
-from dataclasses import dataclass
-
-def process(items: list[dict[str, Any]]) -> dict[str, int] | None:
-    config_path = Path("config.json")
-    return {"count": len(items)} if items else None
-```
 
 ## Recommended Stack
 
@@ -35,76 +25,68 @@ def process(items: list[dict[str, Any]]) -> dict[str, int] | None:
 ## Key Patterns
 
 ### Type Hints
-- All public functions must have type hints
-- Use `X | None` for nullable values (3.10+)
-- Prefer `list[X]` over `List[X]` (3.9+)
-- Use `TypeVar` for generic functions
+- Public functions use type hints — enables static analysis and IDE tooling
+- `X | None` for nullable (3.10+), `list[X]` over `List[X]` (3.9+)
+- `TypeVar` for generics, `Protocol` for structural typing
 
 ### Async
-- Use `asyncio` with modern patterns
-- Avoid blocking in async contexts
-- `asyncio.gather()` for concurrent operations
-- `asyncio.TaskGroup` for structured concurrency (3.11+)
+- Use `asyncio` with `TaskGroup` for structured concurrency (3.11+)
+- Blocking calls in async context stall the event loop — use `asyncio.gather()` for concurrent I/O
 
 ### Path Handling
-- Always `pathlib.Path` over `os.path`
-- Use `.read_text()`, `.write_text()`
-- Proper path resolution, no hardcoding
+- `pathlib.Path` over `os.path`; use `.read_text()`, `.write_text()`
+- Sanitize user-controlled filenames: `replace("/", "_").replace("\\", "_")` before `Path(name).name`. See `reference.md → User-Controlled Filename Sanitization`.
+- Resolve vault/repo roots from a config file, not `Path(__file__).parents[N]` — relocation silently breaks `__file__`-relative walks. See `reference.md → Config-Resolved Roots`.
 
 ### Error Handling
-- Specific exceptions, never bare `except:`
-- Context managers for resources
-- Proper logging with structlog
+- Specific exceptions over bare `except:` — bare form catches SystemExit and KeyboardInterrupt
+- Context managers for resources; logging with structlog
+- `logging.error("msg", exc_info=e)` — preserves traceback; not f-string interpolation
 
 ### Pydantic Settings Validation
 
-Validator timing determines when validation executes:
+`@property` (lazy) → `@field_validator` (per-field) → `@model_validator` (cross-field, after parse). Use `@model_validator` for cross-field security controls. See `reference.md → Pydantic Validators`.
 
-| Decorator | Timing | Use Case |
-|-----------|--------|----------|
-| `@property` | Lazy (on access) | Computed values |
-| `@field_validator` | Per-field (during parse) | Single-field rules |
-| `@model_validator` | Initialization (after parse) | Cross-field security controls |
+### Pydantic Dual-Purpose Models
 
-Security controls typically use `@model_validator` to fail fast:
+Storage + API response in one model: use a thin response model, not `serialization_alias` — alias changes affect GCS/DB output. See `reference.md → Pydantic Dual-Purpose Models`.
 
-```python
-from pydantic import model_validator
+### Pydantic Value Objects
+Compare with `str()` on both sides: `str(a) != str(b)` — prevents silent type-mismatch failures.
 
-class Settings(BaseSettings):
-    environment: str = "development"
-    auth_database_url: str | None = None
+### StrEnum for Status Fields
+Use `StrEnum` for status fields. ORM defaults: `default=WidgetStatus.ACTIVE`, not `default="active"` (bare strings go out of sync).
 
-    @model_validator(mode="after")
-    def validate_production_requirements(self) -> "Settings":
-        if self.environment == "production" and not self.auth_database_url:
-            raise ValueError("AUTH_DATABASE_URL required in production")
-        return self
-```
+### Computed Fields
+Use `@computed_field @property` — included in `.model_dump()` and JSON schema. Avoid `__init__` assignment (bypasses Pydantic validation lifecycle).
 
-### Pydantic Value Object Comparison
+### Module Dispatch
 
-When comparing Pydantic models or value objects, use `str()` on both sides:
+- Per-module `MODE` constant + uniform `render()` / `write()` / `main()` triple lets one orchestrator dispatch heterogeneous modules with no per-module branching.
+- Registry-driven orchestrator: `dict` mapping selector → `(callable, mode, defaults)` — adding a module is a one-line change. See `reference.md → Module Dispatch Patterns`.
 
-```python
-# WRONG - type mismatch causes silent failures
-session.visitor_id.value != visitor_id
+## Experiment Script Isolation
 
-# RIGHT - explicit string conversion
-str(session.visitor_id) != str(visitor_id)
-```
+`[project.optional-dependencies]` groups keep AI/ML deps out of the production image. Install via `uv pip install -e ".[experiments]"`; pair with mypy `exclude` + pytest `norecursedirs`. See `reference.md → Experiment Script Isolation`.
 
-## Anti-Patterns to Avoid
+## Anti-Patterns
 
-| Bad | Good |
-|-----|------|
+| Anti-Pattern | Pattern |
+|--------------|---------|
 | `os.path.join()` | `Path() / "file"` |
 | `%` formatting | f-strings |
 | `pip install` | `uv add` |
 | `flake8` | `Ruff` |
 | `List[str]` | `list[str]` |
 | `Optional[X]` | `X \| None` |
+| `populate_by_name=True` on request models | Keep `False` — widens API input surface by accepting both alias and field name |
 | Mutable default args | `field(default_factory=list)` |
 | `time.time()` for elapsed | `time.perf_counter()` |
+| Custom `http_client=` without lifecycle | Let library manage client |
+| `default="active"` (bare string) | `default=WidgetStatus.ACTIVE` (StrEnum) |
+| `except Exception as err: logging.exception("msg")` | `except Exception: logging.exception("msg")` — `err` unused (ruff F841); exception captured from call stack |
+| `Path(__file__).parents[N]` for repo root | Resolve root from config file — `__file__`-relative walks break on relocation |
 
-See `reference.md` for detailed patterns and `examples.md` for code samples.
+See `reference.md` for: type hints, dataclasses, async patterns, path handling, error handling, docstrings, resource leaks, tooling config, git tracking in ignored dirs, LRU cache with model_copy(), config-resolved roots, module dispatch patterns.
+
+See `examples.md` for: project structure, type-safe config, async HTTP client, repository pattern, modern testing, FastAPI endpoints, structured logging, Django+OpenCV pipeline.
