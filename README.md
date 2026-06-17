@@ -1,7 +1,7 @@
 <h1 align="center">The AI Enhanced Engineer's Team</h1>
 
 <p align="center">
-  <img src="assets/images/cover.jpeg" alt="AIEE Team - Domain specialists for production workflows" width="450" />
+  <img src="assets/images/cover.png" alt="The AIEE Team — a human orchestrator at center wired into a constellation of specialist agents" width="760" />
 </p>
 
 <p align="center">
