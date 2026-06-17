@@ -7,9 +7,9 @@
  * directory so they can be used without the plugin marketplace flow.
  *
  * Usage:
- *   npx aiee-team install [--scope=project|global] [--force] [--dry-run]
- *   npx aiee-team uninstall [--scope=project|global]
- *   npx aiee-team --help
+ *   npx aiee-skills install [--scope=project|global] [--force] [--dry-run]
+ *   npx aiee-skills uninstall [--scope=project|global]
+ *   npx aiee-skills --help
  *
  * Zero runtime dependencies: only Node's standard library, so `npx` is instant.
  */
@@ -32,7 +32,7 @@ const PACKAGE_ROOT = resolve(__dirname, '..');
 
 // Content directories shipped in the package that map 1:1 into a .claude dir.
 const CONTENT_DIRS = ['agents', 'skills', 'commands'];
-const MANIFEST_NAME = '.aiee-team.json';
+const MANIFEST_NAME = '.aiee-skills.json';
 const GROUPS_FILE = join(PACKAGE_ROOT, 'groups.json');
 
 function pkgVersion() {
@@ -62,7 +62,7 @@ function selectContent(groupIds) {
   const unknown = groupIds.filter((g) => !known.includes(g));
   if (unknown.length > 0) {
     throw new Error(
-      `Unknown group(s): ${unknown.join(', ')}\n  Available: ${known.join(', ')}\n  See: npx aiee-team --list-groups`
+      `Unknown group(s): ${unknown.join(', ')}\n  Available: ${known.join(', ')}\n  See: npx aiee-skills --list-groups`
     );
   }
   const coreIds = known.filter((g) => groups[g].core);
@@ -119,7 +119,7 @@ function install(opts) {
   // Commands are always installed in full (there are only a couple).
   const selection = selectContent(opts.groups);
 
-  console.log(`\n  aiee-team v${version}`);
+  console.log(`\n  aiee-skills v${version}`);
   console.log(`  scope:  ${opts.scope === 'global' ? 'global' : 'project'}`);
   console.log(`  groups: ${selection ? selection.resolvedGroups.join(', ') : 'all'}`);
   console.log(`  target: ${target}${opts.dryRun ? '  (dry run)' : ''}\n`);
@@ -186,7 +186,7 @@ function install(opts) {
       manifestPath,
       JSON.stringify(
         {
-          name: 'aiee-team',
+          name: 'aiee-skills',
           version,
           scope: opts.scope === 'global' ? 'global' : 'project',
           groups: mergedGroups,
@@ -213,10 +213,10 @@ function install(opts) {
 function uninstall(opts) {
   const target = resolveTarget(opts.scope);
   const manifestPath = join(target, MANIFEST_NAME);
-  console.log(`\n  Uninstalling aiee-team from ${target}\n`);
+  console.log(`\n  Uninstalling aiee-skills from ${target}\n`);
 
   if (!existsSync(manifestPath)) {
-    console.log('  No aiee-team manifest found here. Nothing to remove.');
+    console.log('  No aiee-skills manifest found here. Nothing to remove.');
     console.log('  (Tip: pass --scope=global if you installed globally.)\n');
     return;
   }
@@ -279,14 +279,14 @@ function listGroups() {
 
 function help() {
   console.log(`
-  aiee-team — install AIEE specialist agents, skills, and commands into Claude Code
+  aiee-skills — install AIEE specialist agents, skills, and commands into Claude Code
 
   Usage:
-    npx aiee-team install [options]      Copy agents/skills/commands into a .claude dir
-    npx aiee-team uninstall [options]    Remove items recorded in the install manifest
-    npx aiee-team --list-groups          List skill groups and their counts
-    npx aiee-team --version              Print version
-    npx aiee-team --help                 Show this help
+    npx aiee-skills install [options]      Copy agents/skills/commands into a .claude dir
+    npx aiee-skills uninstall [options]    Remove items recorded in the install manifest
+    npx aiee-skills --list-groups          List skill groups and their counts
+    npx aiee-skills --version              Print version
+    npx aiee-skills --help                 Show this help
 
   Options:
     --scope=project       Install into ./.claude (default)
@@ -297,10 +297,10 @@ function help() {
     -n, --dry-run         Show what would change without writing
 
   Examples:
-    npx aiee-team install
-    npx aiee-team install --groups=frontend-web,backend-api
-    npx aiee-team install --global --groups=cloud-infra
-    npx github:ai-enhanced-engineer/aiee-team install
+    npx aiee-skills install
+    npx aiee-skills install --groups=frontend-web,backend-api
+    npx aiee-skills install --global --groups=cloud-infra
+    npx github:ai-enhanced-engineer/aiee-skills install
 `);
 }
 

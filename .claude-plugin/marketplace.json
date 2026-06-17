@@ -1,7 +1,7 @@
 {
   "entries": [
     {
-      "name": "aiee-team",
+      "name": "aiee-skills",
       "source": "./",
       "description": "AI Enhanced Engineer development team agents and workflows",
       "version": "1.3.1",
@@ -20,7 +20,7 @@
         "security",
         "testing"
       ],
-      "repository": "https://github.com/ai-enhanced-engineer/aiee-team",
+      "repository": "https://github.com/ai-enhanced-engineer/aiee-skills",
       "license": "MIT"
     }
   ]

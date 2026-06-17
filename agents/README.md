@@ -42,7 +42,7 @@ skills: arch-ddd, fastapi-patterns, dev-standards  # Optional — comma-separate
    - **Expertise Scope** — the technologies and patterns it knows
    - **When to Call** — concrete scenarios where it adds value
    - **NOT For** — out-of-scope tasks, so the orchestrator avoids misrouting
-5. **Assign it to a group** — add the agent to the matching group's `agents` list in [`groups.json`](../groups.json) so it installs with `npx aiee-team install --groups=<group>`. An agent in no group is only included in a full install.
+5. **Assign it to a group** — add the agent to the matching group's `agents` list in [`groups.json`](../groups.json) so it installs with `npx aiee-skills install --groups=<group>`. An agent in no group is only included in a full install.
 6. **Update the main README** — add a row to the Team table.
 7. **Open a pull request.**
 

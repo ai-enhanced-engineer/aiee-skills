@@ -59,7 +59,7 @@ updated: 2026-06-03                 # Optional — last-updated date (YYYY-MM-DD
 2. **Create the directory** — `skills/<skill-name>/`
 3. **Write SKILL.md** — frontmatter + the act-now layer; move depth to `reference.md` / `examples.md` if needed.
 4. **Wire it to an agent** — add the skill name to the `skills:` field of the relevant agent(s).
-5. **Assign it to a group** — add the skill name to the right group in [`groups.json`](../groups.json) so it installs via `npx aiee-team install --groups=<group>`. A skill in no group is only included in a full install (`npx aiee-team --list-groups` flags ungrouped skills).
+5. **Assign it to a group** — add the skill name to the right group in [`groups.json`](../groups.json) so it installs via `npx aiee-skills install --groups=<group>`. A skill in no group is only included in a full install (`npx aiee-skills --list-groups` flags ungrouped skills).
 6. **Update the main README** — add a row to the relevant group's coverage if needed.
 7. **Open a pull request.**
 

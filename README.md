@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ai-enhanced-engineer/aiee-team/releases"><img src="https://img.shields.io/github/v/release/ai-enhanced-engineer/aiee-team" alt="Version" /></a>
+  <a href="https://github.com/ai-enhanced-engineer/aiee-skills/releases"><img src="https://img.shields.io/github/v/release/ai-enhanced-engineer/aiee-skills" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
-  <a href="https://github.com/ai-enhanced-engineer/aiee-team/actions"><img src="https://img.shields.io/github/actions/workflow/status/ai-enhanced-engineer/aiee-team/release.yml?branch=main" alt="Build Status" /></a>
+  <a href="https://github.com/ai-enhanced-engineer/aiee-skills/actions"><img src="https://img.shields.io/github/actions/workflow/status/ai-enhanced-engineer/aiee-skills/release.yml?branch=main" alt="Build Status" /></a>
 </p>
 
 <p align="center">
@@ -59,29 +59,29 @@ The two failure modes these guard against: **bloat** (one skill grows into an es
 **Plugin marketplace** (recommended for Claude Code):
 
 ```shell
-/plugin marketplace add ai-enhanced-engineer/aiee-team
-/plugin install aiee-team@aiee-team
+/plugin marketplace add ai-enhanced-engineer/aiee-skills
+/plugin install aiee-skills@aiee-skills
 /agents   # verify the specialists are listed
 ```
 
 **npx** (no marketplace — copies into a `.claude` directory):
 
 ```shell
-npx aiee-team install              # into ./.claude for this project
-npx aiee-team install --global     # into ~/.claude for every project
+npx aiee-skills install              # into ./.claude for this project
+npx aiee-skills install --global     # into ~/.claude for every project
 ```
 
-Runs straight from GitHub before any npm publish: `npx github:ai-enhanced-engineer/aiee-team install`. Other commands: `--dry-run`, `--force`, `uninstall`, `--help`.
+Runs straight from GitHub before any npm publish: `npx github:ai-enhanced-engineer/aiee-skills install`. Other commands: `--dry-run`, `--force`, `uninstall`, `--help`.
 
-**Local development:** `git clone https://github.com/ai-enhanced-engineer/aiee-team.git` then `claude --plugin-dir ./`. JSON manifests validate with `just validate`.
+**Local development:** `git clone https://github.com/ai-enhanced-engineer/aiee-skills.git` then `claude --plugin-dir ./`. JSON manifests validate with `just validate`.
 
 ## Install by Technology
 
 The pack is grouped by technology, and each group brings its **specialist agent(s) plus skills**. `dev-practices` is shared by every agent, so it's always included. A full install (no `--groups`) gets all 11 agents and 102 skills.
 
 ```shell
-npx aiee-team --list-groups                              # groups, skill + agent counts
-npx aiee-team install --groups=frontend-web,backend-api  # install just those
+npx aiee-skills --list-groups                              # groups, skill + agent counts
+npx aiee-skills install --groups=frontend-web,backend-api  # install just those
 ```
 
 | Group | Skills | Agents | Covers |
@@ -118,7 +118,7 @@ Eleven specialists, each composed from the skills it loads. Claude routes to the
 102 skills across the eight groups above, each a `SKILL.md` directory (plus optional `reference.md` / `examples.md`). Browse them live:
 
 ```shell
-npx aiee-team --list-groups      # every group and its skill count
+npx aiee-skills --list-groups      # every group and its skill count
 ls skills/                       # the full directory of 102 skills
 ```
 
@@ -145,7 +145,7 @@ This repo is the runnable companion to AIEE's writing and teaching:
 ## Repository Structure
 
 ```
-aiee-team/
+aiee-skills/
 ├── .claude-plugin/       # plugin.json + marketplace.json (Claude Code plugin)
 ├── agents/               # 11 specialist agent definitions
 ├── bin/install.js        # npx installer
@@ -163,7 +163,7 @@ aiee-team/
 | Add or modify an **agent** | [`agents/README.md`](agents/README.md) |
 | Add or modify a **skill** | [`skills/README.md`](skills/README.md) |
 
-After changes, update the tables in this README **and** the mapping in [`groups.json`](groups.json) so new agents and skills are reachable via `npx aiee-team install --groups=...`. Run `npx aiee-team --list-groups` to confirm nothing is left ungrouped.
+After changes, update the tables in this README **and** the mapping in [`groups.json`](groups.json) so new agents and skills are reachable via `npx aiee-skills install --groups=...`. Run `npx aiee-skills --list-groups` to confirm nothing is left ungrouped.
 
 ## License
 

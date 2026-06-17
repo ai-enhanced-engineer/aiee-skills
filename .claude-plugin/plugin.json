@@ -1,9 +1,9 @@
 {
-  "name": "aiee-team",
+  "name": "aiee-skills",
   "version": "1.5.0",
-  "description": "AI Enhanced Engineer development team agents",
+  "description": "Production-engineering skills and specialist agents for Claude Code, from AI Enhanced Engineer",
   "author": {
-    "name": "AIEE Team"
+    "name": "AI Enhanced Engineer"
   },
   "commands": [
     {

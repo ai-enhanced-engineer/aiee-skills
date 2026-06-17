@@ -1,5 +1,5 @@
 {
-  "name": "aiee-team",
+  "name": "aiee-skills",
   "version": "1.5.0",
   "description": "Install AI Enhanced Engineer specialist agents, skills, and commands into Claude Code via npx",
   "keywords": [
@@ -12,21 +12,21 @@
     "backend",
     "frontend"
   ],
-  "homepage": "https://github.com/ai-enhanced-engineer/aiee-team#readme",
+  "homepage": "https://github.com/ai-enhanced-engineer/aiee-skills#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ai-enhanced-engineer/aiee-team.git"
+    "url": "git+https://github.com/ai-enhanced-engineer/aiee-skills.git"
   },
   "license": "MIT",
   "author": {
-    "name": "AIEE Team"
+    "name": "AI Enhanced Engineer"
   },
   "type": "module",
   "engines": {
     "node": ">=18"
   },
   "bin": {
-    "aiee-team": "bin/install.js"
+    "aiee-skills": "bin/install.js"
   },
   "files": [
     "bin/",
