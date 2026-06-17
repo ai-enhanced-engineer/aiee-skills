@@ -1,0 +1,158 @@
+{
+  "frontend-web": {
+    "description": "React / Angular / Svelte / Next.js, CSS, forms, web accessibility, Stripe Elements",
+    "agents": ["aiee-frontend-engineer"],
+    "skills": [
+      "design-system-workflow",
+      "frontend-accessibility",
+      "frontend-angular",
+      "frontend-angular-ai",
+      "frontend-angular-tooling",
+      "frontend-design-systems",
+      "frontend-material-chat",
+      "frontend-material-design-3",
+      "frontend-svelte",
+      "nextjs-16-app-router",
+      "nextjs-pwa-offline",
+      "qa-angular",
+      "react-hook-form-zod-nextjs",
+      "react-i18n-context-patterns",
+      "react-query-patterns",
+      "react-redux-spa-patterns",
+      "react-streaming-sse-patterns",
+      "react-vite-modern-patterns",
+      "react-zustand-patterns",
+      "redux-duck-flow-pattern",
+      "stripe-elements-react",
+      "tailwindcss-4-patterns",
+      "testing-angular",
+      "vite-pwa-patterns",
+      "web-open-redirect-guards"
+    ]
+  },
+  "mobile": {
+    "description": "React Native / Expo, iOS / Swift / SwiftUI, watchOS, mobile deploy and testing",
+    "agents": ["aiee-mobile-engineer", "aiee-ios-engineer"],
+    "skills": [
+      "formik-yup-react-native",
+      "healthkit-biofeedback",
+      "ios-app-quality",
+      "ios-audio-haptics",
+      "mobile-app-deployment",
+      "mobile-e2e-testing",
+      "mobile-offline-sync",
+      "mobile-push-notifications",
+      "mobile-video-upload",
+      "react-native-camera-video",
+      "react-native-container-component",
+      "react-native-expo-patterns",
+      "react-native-legacy-builds",
+      "react-native-ml-inference",
+      "react-native-modern-patterns",
+      "redux-persist-asyncstorage",
+      "swift-app-structure",
+      "swift-patterns-architecture",
+      "swift-swiftui",
+      "watchos-development"
+    ]
+  },
+  "backend-api": {
+    "description": "FastAPI / NestJS / Laravel, databases, ORMs, auth, Stripe webhooks, API testing",
+    "agents": ["aiee-backend-engineer", "aiee-data-engineer"],
+    "skills": [
+      "fastapi-patterns",
+      "ffmpeg-laravel-video",
+      "jest-nestjs-testing",
+      "laravel-auth-hardening",
+      "laravel-ci-mysql",
+      "laravel-mix-webpack",
+      "laravel-modern-patterns",
+      "laravel-pint-patterns",
+      "laravel-s3-storage",
+      "laravel-sail-docker",
+      "mongodb-asyncmongoclient-patterns",
+      "mongodb-atlas-patterns",
+      "nestjs-patterns",
+      "passport-jwt-nestjs",
+      "psycopg3-async-patterns",
+      "pyjwt-fastapi-validation",
+      "pytest-fastapi-async",
+      "redis-async-caching-python",
+      "stripe-webhook-laravel",
+      "typeorm-patterns"
+    ]
+  },
+  "cloud-infra": {
+    "description": "GCP / AWS / Azure, Terraform, CI/CD, observability, security hardening, static deploy",
+    "agents": [
+      "aiee-devops-engineer",
+      "aiee-sre-engineer",
+      "aiee-observability-engineer",
+      "aiee-security-engineer"
+    ],
+    "skills": [
+      "aws-app-runner",
+      "aws-cicd-patterns",
+      "aws-security-hardening",
+      "azure-functions-python-v2",
+      "azure-identity-m2m-auth",
+      "azure-service-bus-messaging",
+      "azure-workflow-execution-models",
+      "caddy-tls-proxy",
+      "gcp-cicd-patterns",
+      "gcp-cloud-run",
+      "gcp-cloudsql-infrastructure",
+      "gcp-finops",
+      "gcp-observability",
+      "gcp-security-hardening",
+      "github-actions-cicd",
+      "infra-terraform",
+      "static-site-deployment"
+    ]
+  },
+  "python-core": {
+    "description": "Modern Python patterns, Poetry, Docker, ruff",
+    "agents": ["aiee-python-expert-engineer"],
+    "skills": [
+      "arch-python-modern",
+      "docker-python",
+      "docker-python-poetry",
+      "poetry-python-monorepo",
+      "ruff-python-quality"
+    ]
+  },
+  "architecture": {
+    "description": "DDD, ADRs, diagrams, event-driven design, MVP roadmap, compliance, sprint planning",
+    "agents": ["aiee-systems-architect"],
+    "skills": [
+      "arch-ddd",
+      "arch-decision-records",
+      "arch-diagrams",
+      "arch-events",
+      "arch-mvp-roadmap",
+      "compliance-frameworks",
+      "product-sprint-planning"
+    ]
+  },
+  "dev-practices": {
+    "description": "Cross-cutting engineering discipline: standards, debugging, performance, unit-test standards",
+    "core": true,
+    "agents": [],
+    "skills": [
+      "dev-debugging-strategies",
+      "dev-standards",
+      "performance-engineering",
+      "unit-test-standards"
+    ]
+  },
+  "ai-ml": {
+    "description": "Vision and video understanding, on-device Apple AI, LangChain + Azure OpenAI",
+    "agents": [],
+    "skills": [
+      "ai-video-understanding",
+      "apple-foundation-models",
+      "langchain-azure-openai-patterns",
+      "video-preprocessing-python"
+    ]
+  }
+}
