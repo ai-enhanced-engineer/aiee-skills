@@ -1,20 +1,18 @@
-# Writing a Skill That Earns Its Place
+# Skills
 
-A skill encodes the decisions a senior engineer makes without thinking, so an agent can make them too. It's a directory with one required file, `SKILL.md`, that an agent loads on demand when a task calls for it.
-
-The hard part isn't writing one — it's writing one that stays legible as the library grows. This guide is the rubric.
+A skill is a directory with one required file, `SKILL.md`, that an agent loads on demand. This guide is the rubric for writing one that stays legible as the library grows.
 
 ## The Five Disciplines
 
-Every skill here is judged against five concerns, in order of importance:
+Every skill is judged against five concerns, in order of importance:
 
-1. **Shape** — partition by urgency, not length. Act-now rules go in `SKILL.md`; reference depth moves to `reference.md`; runnable code moves to `examples.md`. A reader who needs the decision shouldn't have to scroll past the appendix to find it.
-2. **Findability** — the `description` field is the routing contract. The agent reads it and nothing else to decide whether to load the skill — the body, the title, and any other field are inert to the router. Write it in the *caller's* vocabulary (the symptoms and tasks that should trigger it), not the author's.
-3. **Voice** — describe a consequence, not a command. The reader is a reasoning engine, not a recruit. Replace `always`/`never`/`must` with the outcome: *"Skipping the index makes this query table-scan at scale"* beats *"Always add an index."*
-4. **Portability** — write it to leave home. No project-specific paths, client names, or repo assumptions in `SKILL.md`. Anything local belongs in the optional sibling files, never the core.
-5. **Evolution** — new skill or update? If you can't write a one-sentence `description` that separates the candidate from every skill already in `skills/`, it's an update to an existing one.
+1. **Shape** — partition by urgency, not length: act-now rules in `SKILL.md`, reference depth in `reference.md`, runnable code in `examples.md`.
+2. **Findability** — the `description` is the routing contract; the agent reads it and nothing else to decide whether to load. Write it in the *caller's* vocabulary, not the author's.
+3. **Voice** — describe a consequence, not a command: *"Skipping the index makes this query table-scan at scale"* beats *"Always add an index."*
+4. **Portability** — write it to leave home: no project-specific paths, client names, or repo assumptions in `SKILL.md`. Anything local belongs in the sibling files.
+5. **Evolution** — new skill or update? If you can't write a one-sentence `description` that separates it from every existing skill, it's an update.
 
-The two failure modes these guard against: **bloat** (one skill grows into an essay nobody loads) and **sprawl** (hundreds of thin skills nobody can find).
+These guard against **bloat** (one skill grows into an essay nobody loads) and **sprawl** (hundreds of thin skills nobody can find).
 
 ## File Structure
 

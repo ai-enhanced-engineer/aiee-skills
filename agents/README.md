@@ -1,12 +1,10 @@
-# Composing an Agent
+# Agents
 
-An agent is a domain specialist, but it carries almost no knowledge of its own. Its expertise is the **union of the skills it loads** — declared in its `skills:` frontmatter (the YAML block at the top of the file) and pulled into context when the agent activates. Change the skill list, change the specialist.
+An agent is a domain specialist whose expertise is the **union of the skills it loads**, declared in its `skills:` frontmatter. Change the skill list, change the specialist — so a new capability is usually a new skill on an existing agent, not a new agent.
 
 ```
 Request → orchestrator routes to an agent → agent + its skills load → task runs
 ```
-
-This is what keeps the roster cheap to extend: a new capability is usually a new skill wired into an existing agent, not a new agent.
 
 ## Agent Frontmatter
 
