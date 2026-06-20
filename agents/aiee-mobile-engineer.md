@@ -49,75 +49,23 @@ Senior mobile engineer specializing in React Native + Expo for cross-platform iO
 
 ### Redux Duck Pattern
 
-```javascript
-// features/auth/authSlice.js
-import { createSlice } from '@reduxjs/toolkit';
+Follow `redux-duck-flow-pattern` for slice/action/reducer co-location with Redux Toolkit `createSlice`.
 
-const authSlice = createSlice({
-  name: 'auth',
-  initialState: { user: null, token: null, loading: false },
-  reducers: {
-    loginStart: (state) => { state.loading = true; },
-    loginSuccess: (state, action) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-      state.loading = false;
-    },
-    loginFailure: (state) => { state.loading = false; },
-    logout: (state) => { state.user = null; state.token = null; }
-  }
-});
+### State Management Decision
 
-export const { loginStart, loginSuccess, loginFailure, logout } = authSlice.actions;
-export default authSlice.reducer;
-```
-
-## State Management Architecture Decision
-
-### Why Redux for React Native Mobile Applications?
-
-**Rationale**: Redux was chosen for React Native mobile applications due to its mature offline-first ecosystem and comprehensive state management capabilities:
-
-**Advantages**:
-- **Redux Persist Integration**: Seamless AsyncStorage integration for offline-first architecture
-- **Offline-First Patterns**: Mature patterns for handling intermittent connectivity
-- **Time-Travel Debugging**: Redux DevTools enables state inspection across app restarts
-- **Middleware Ecosystem**: Redux Thunk, Redux Saga for complex async workflows
-- **Community Patterns**: Extensive mobile-specific patterns (offline queues, conflict resolution)
-
-**Offline-First is Critical**: Mobile apps must work without network. Redux Persist + AsyncStorage provides battle-tested patterns for:
-- Persisting user data across app restarts
-- Queuing mutations during offline periods
-- Syncing when connection restored
-- Handling merge conflicts
-
-**When NOT to use Redux**:
-- Simple read-only mobile app → React Query may suffice
-- No offline requirements → Consider Zustand for simplicity (see frontend-engineer for patterns)
-
-**Cross-Reference**: For web applications without offline requirements, see `aiee-frontend-engineer` which uses Zustand for lighter-weight state management.
+| Choice | When |
+|--------|------|
+| **Redux + Redux Persist** | Offline-first apps needing AsyncStorage persistence, mutation queues, and conflict resolution (default for this pack). |
+| React Query | Read-mostly apps with no offline write requirements. |
+| Zustand | Lightweight web state with no offline needs — see `aiee-frontend-engineer`. |
 
 ### Container/Component Pattern
 
-```javascript
-// containers/HomeContainer.js
-import { connect } from 'react-redux';
-import HomeScreen from '../components/HomeScreen';
-
-const mapStateToProps = (state) => ({
-  user: state.auth.user,
-  images: state.images.list
-});
-
-const mapDispatchToProps = {
-  fetchImages,
-  uploadImage
-};
-
-export default connect(mapStateToProps, mapDispatchToProps)(HomeScreen);
-```
+Follow `react-native-container-component` for the `connect`-based container/presentational split.
 
 ### React Navigation Setup
+
+> Kept inline: no owning skill in this pack (`react-navigation-5-patterns` not present).
 
 ```javascript
 // navigation/AppNavigator.js
@@ -140,187 +88,16 @@ export default function AppNavigator() {
 
 ## Offline-First Architecture
 
-### Redux Persist Configuration
-
-```javascript
-// store/configureStore.js
-import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer } from 'redux-persist';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import rootReducer from './rootReducer';
-
-const persistConfig = {
-  key: 'root',
-  storage: AsyncStorage,
-  whitelist: ['auth', 'images'] // Only persist these reducers
-};
-
-const persistedReducer = persistReducer(persistConfig, rootReducer);
-
-export const store = configureStore({
-  reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE']
-      }
-    })
-});
-
-export const persistor = persistStore(store);
-```
-
-### App Entry Point with PersistGate
-
-```javascript
-// App.js
-import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react';
-import { store, persistor } from './store/configureStore';
-import AppNavigator from './navigation/AppNavigator';
-import LoadingScreen from './components/LoadingScreen';
-
-export default function App() {
-  return (
-    <Provider store={store}>
-      <PersistGate loading={<LoadingScreen />} persistor={persistor}>
-        <AppNavigator />
-      </PersistGate>
-    </Provider>
-  );
-}
-```
+Follow `redux-persist-asyncstorage` for the `persistConfig` + `persistStore`/`persistReducer` store wiring and the `PersistGate` app entry point (whitelist, serializable-check exemptions, loading screen).
 
 ## Form Handling with Formik + Yup
 
-```javascript
-import { Formik } from 'formik';
-import * as Yup from 'yup';
-import { FormControl, Input, Button } from 'native-base';
-
-const LoginSchema = Yup.object().shape({
-  email: Yup.string().email('Invalid email').required('Required'),
-  password: Yup.string().min(6, 'Too short').required('Required')
-});
-
-export default function LoginForm({ onSubmit }) {
-  return (
-    <Formik
-      initialValues={{ email: '', password: '' }}
-      validationSchema={LoginSchema}
-      onSubmit={onSubmit}
-    >
-      {({ handleChange, handleSubmit, values, errors, touched }) => (
-        <FormControl isInvalid={errors.email && touched.email}>
-          <Input
-            placeholder="Email"
-            value={values.email}
-            onChangeText={handleChange('email')}
-          />
-          {errors.email && touched.email && (
-            <FormControl.ErrorMessage>{errors.email}</FormControl.ErrorMessage>
-          )}
-          <FormControl isInvalid={errors.password && touched.password}>
-            <Input
-              placeholder="Password"
-              secureTextEntry
-              value={values.password}
-              onChangeText={handleChange('password')}
-            />
-            {errors.password && touched.password && (
-              <FormControl.ErrorMessage>{errors.password}</FormControl.ErrorMessage>
-            )}
-          </FormControl>
-          <Button onPress={handleSubmit}>Login</Button>
-        </FormControl>
-      )}
-    </Formik>
-  );
-}
-```
+Follow `formik-yup-react-native` for the `Formik` + `Yup` schema validation pattern with NativeBase form controls.
 
 ## Expo Module Integration
 
-### Camera Usage
-
-```javascript
-import { Camera } from 'expo-camera';
-import { useState, useEffect, useRef } from 'react';
-
-export default function CameraScreen() {
-  const [hasPermission, setHasPermission] = useState(null);
-  const cameraRef = useRef(null);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
-
-  const takePicture = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
-      // Upload photo or save locally
-      console.log('Photo URI:', photo.uri);
-    }
-  };
-
-  if (hasPermission === null) {
-    return <Text>Requesting camera permission...</Text>;
-  }
-  if (hasPermission === false) {
-    return <Text>No camera access</Text>;
-  }
-
-  return (
-    <Camera ref={cameraRef} style={{ flex: 1 }}>
-      <Button onPress={takePicture}>Capture</Button>
-    </Camera>
-  );
-}
-```
-
-### Image Picker
-
-```javascript
-import * as ImagePicker from 'expo-image-picker';
-
-export async function pickImage() {
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [4, 3],
-    quality: 1,
-  });
-
-  if (!result.canceled) {
-    return result.assets[0].uri;
-  }
-  return null;
-}
-```
-
-### File System Operations
-
-```javascript
-import * as FileSystem from 'expo-file-system';
-
-export async function saveImageLocally(uri, filename) {
-  const fileUri = FileSystem.documentDirectory + filename;
-  await FileSystem.copyAsync({
-    from: uri,
-    to: fileUri
-  });
-  return fileUri;
-}
-
-export async function readLocalFile(filename) {
-  const fileUri = FileSystem.documentDirectory + filename;
-  const content = await FileSystem.readAsStringAsync(fileUri);
-  return content;
-}
-```
+- **Camera and image picker** — follow `react-native-camera-video` for permission flow, capture, and `expo-image-picker` library access.
+- **File system operations** — follow `react-native-expo-patterns` for `expo-file-system` read/write/copy of local files.
 
 ## Performance Optimization
 
@@ -332,75 +109,13 @@ export async function readLocalFile(filename) {
 | **Bundle size** | Code splitting, remove console.log in production |
 | **Navigation** | Lazy load screens with `React.lazy` |
 
-### FlatList Optimization
+### FlatList Optimization and React.memo
 
-```javascript
-import { FlatList } from 'react-native';
-
-const ITEM_HEIGHT = 80;
-
-export default function ImageList({ data }) {
-  const renderItem = ({ item }) => <ImageCard image={item} />;
-
-  return (
-    <FlatList
-      data={data}
-      renderItem={renderItem}
-      keyExtractor={(item) => item.id}
-      getItemLayout={(data, index) => ({
-        length: ITEM_HEIGHT,
-        offset: ITEM_HEIGHT * index,
-        index,
-      })}
-      removeClippedSubviews={true}
-      maxToRenderPerBatch={10}
-      windowSize={10}
-    />
-  );
-}
-```
-
-### React.memo for Components
-
-```javascript
-import { memo } from 'react';
-
-const ImageCard = memo(({ image }) => {
-  return (
-    <View>
-      <Image source={{ uri: image.url }} />
-      <Text>{image.title}</Text>
-    </View>
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if image.id changed
-  return prevProps.image.id === nextProps.image.id;
-});
-
-export default ImageCard;
-```
+Follow `react-native-modern-patterns` for `FlatList` tuning (`getItemLayout`, `keyExtractor`, `removeClippedSubviews`, batch/window sizing) and `React.memo` re-render gating.
 
 ## Testing Strategy
 
-```javascript
-// __tests__/LoginScreen.test.js
-import { render, fireEvent } from '@testing-library/react-native';
-import LoginScreen from '../LoginScreen';
-
-test('submits form with valid credentials', () => {
-  const onSubmit = jest.fn();
-  const { getByPlaceholderText, getByText } = render(<LoginScreen onSubmit={onSubmit} />);
-
-  fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-  fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
-  fireEvent.press(getByText('Login'));
-
-  expect(onSubmit).toHaveBeenCalledWith({
-    email: 'test@example.com',
-    password: 'password123'
-  });
-});
-```
+Follow `mobile-e2e-testing` for the Jest + React Native Testing Library approach (`render`/`fireEvent` interaction assertions).
 
 ## Anti-Patterns to Avoid
 
@@ -416,6 +131,8 @@ test('submits form with valid credentials', () => {
 - **Not optimizing images** - Compress images before upload
 
 ## Deep Linking Setup
+
+> Kept inline: no owning skill in this pack (`react-navigation-5-patterns` not present).
 
 ```javascript
 // app.json
@@ -457,21 +174,7 @@ export default linking;
 
 ## OTA Updates with Expo
 
-```javascript
-import * as Updates from 'expo-updates';
-
-export async function checkForUpdates() {
-  try {
-    const update = await Updates.checkForUpdateAsync();
-    if (update.isAvailable) {
-      await Updates.fetchUpdateAsync();
-      await Updates.reloadAsync();
-    }
-  } catch (error) {
-    console.error('Error checking for updates:', error);
-  }
-}
-```
+Follow `react-native-expo-patterns` for the `expo-updates` check/fetch/reload flow.
 
 ## Success Metrics
 

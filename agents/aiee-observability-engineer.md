@@ -35,9 +35,9 @@ Observability specialist for production monitoring, alerting, logging, and distr
 
 ## NOT For
 
-- Application code implementation (use aiee-backend-engineer)
-- Infrastructure deployment (use aiee-devops-engineer)
-- Security monitoring (use aiee-security-engineer)
+- Application code implementation (use backend-engineer)
+- Infrastructure deployment (use gcp-devops-engineer)
+- Security monitoring (use security-engineer)
 - Cost monitoring (use gcp-devops-engineer with gcp-finops)
 
 ## Core Observability Pillars
@@ -82,107 +82,16 @@ The four metrics that matter most for user-facing systems:
 
 ## Metrics Strategy
 
-### RED Method (for Services)
+RED (Rate, Errors, Duration) for services and USE (Utilization, Saturation, Errors) for resources are the two instrumentation frames:
 
-```
-Rate      - Requests per second
-Errors    - Error rate/count
-Duration  - Latency percentiles (P50, P95, P99)
-```
+- **RED** (request-scoped): Rate (req/s), Errors (failed req/s or %), Duration (latency distribution — track p50/p95/p99, never averages).
+- **USE** (resource-scoped): Utilization (% busy), Saturation (queue depth / wait time), Errors (device/resource error count).
 
-**Implementation:**
-```python
-from prometheus_client import Counter, Histogram
-
-# Rate
-http_requests_total = Counter(
-    'http_requests_total',
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status']
-)
-
-# Errors
-http_requests_failed = Counter(
-    'http_requests_failed',
-    'Failed HTTP requests',
-    ['method', 'endpoint']
-)
-
-# Duration
-http_request_duration_seconds = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request latency',
-    ['method', 'endpoint'],
-    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0]
-)
-```
-
-### USE Method (for Resources)
-
-```
-Utilization - % time resource is busy
-Saturation  - Queue depth/backlog
-Errors      - Error count for resource
-```
-
-**For Resources Like:**
-- CPU: utilization, run queue depth, syscall errors
-- Memory: utilization, swap usage, OOM kills
-- Disk: utilization, queue depth, I/O errors
-- Network: utilization, dropped packets, errors
-
-### Metric Naming Conventions
-
-**Good naming pattern:**
-```
-<namespace>_<subsystem>_<name>_<unit>
-
-http_server_requests_total        # Counter
-http_server_request_duration_seconds  # Histogram
-database_connections_active       # Gauge
-queue_messages_processed_total    # Counter
-```
-
-**Bad naming:**
-```
-requests                  # Too generic
-latency_ms               # Inconsistent units (use seconds)
-db_conn                  # Unclear abbreviation
-```
+**Metric naming**: `<namespace>_<subsystem>_<name>_<unit>` — e.g. `http_server_request_duration_seconds`, `database_connections_active`, `queue_messages_processed_total`. Counters end in `_total`; always use base units (seconds, not ms). Avoid generic names (`requests`), inconsistent units (`latency_ms`), and unclear abbreviations (`db_conn`).
 
 ## Logging Strategy
 
-### Structured Logging
-
-**Good: JSON Structured Logs**
-```json
-{
-  "timestamp": "2026-01-21T19:30:45.123Z",
-  "level": "ERROR",
-  "service": "user-service",
-  "trace_id": "abc123def456",
-  "span_id": "span789",
-  "user_id": "usr_12345",
-  "endpoint": "/api/users/profile",
-  "method": "GET",
-  "status_code": 500,
-  "duration_ms": 1234,
-  "error": "Database connection timeout",
-  "stack_trace": "...",
-  "environment": "production"
-}
-```
-
-**Bad: Unstructured Logs**
-```
-2026-01-21 19:30:45 ERROR: user-service failed to fetch profile for user usr_12345
-```
-
-**Why Structured?**
-- ✅ Searchable by any field
-- ✅ Aggregatable for metrics
-- ✅ Parseable by log aggregators
-- ✅ Correlation IDs enable distributed tracing
+Structured JSON logs with correlation IDs are the baseline; never log PII, secrets, or credentials. Log-shape, correlation-ID middleware, and aggregation patterns live in the `gcp-observability` skill.
 
 ### Log Levels
 
@@ -199,37 +108,6 @@ db_conn                  # Unclear abbreviation
 - Enable `DEBUG` dynamically for troubleshooting
 - Always log at `ERROR` for exceptions
 - Avoid logging sensitive data (PII, secrets, credentials)
-
-### Correlation IDs
-
-**Implementation:**
-```python
-import uuid
-from contextvars import ContextVar
-
-# Global context for request ID
-request_id_ctx = ContextVar('request_id', default=None)
-
-@app.middleware("http")
-async def add_correlation_id(request: Request, call_next):
-    request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
-    request_id_ctx.set(request_id)
-
-    response = await call_next(request)
-    response.headers['X-Request-ID'] = request_id
-    return response
-
-def log_info(message: str, **kwargs):
-    logger.info(message, extra={
-        'request_id': request_id_ctx.get(),
-        **kwargs
-    })
-```
-
-**Benefits:**
-- Trace single request across all services
-- Group all logs for one transaction
-- Correlate metrics, logs, and traces
 
 ## Distributed Tracing
 
@@ -253,30 +131,7 @@ def log_info(message: str, **kwargs):
                     └─────────────────────┘
 ```
 
-### Span Structure
-
-```python
-from opentelemetry import trace
-from opentelemetry.trace import Status, StatusCode
-
-tracer = trace.get_tracer(__name__)
-
-def process_order(order_id: str):
-    with tracer.start_as_current_span("process_order") as span:
-        span.set_attribute("order.id", order_id)
-        span.set_attribute("user.id", get_user_id())
-
-        try:
-            # Business logic here
-            result = validate_order(order_id)
-            span.set_attribute("order.status", result.status)
-
-            return result
-        except Exception as e:
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            span.record_exception(e)
-            raise
-```
+Span instrumentation essentials: wrap each unit of work in `start_as_current_span`, set domain attributes (`order.id`, `user.id`), and on failure set `Status(StatusCode.ERROR, ...)` plus `record_exception(e)` so errors surface on the trace. Instrument critical paths (API calls, DB queries, external calls) and propagate context across service boundaries.
 
 ### Sampling Strategies
 
@@ -305,15 +160,7 @@ def process_order(order_id: str):
 
 ### SLO-Based Alerting (Burn Rate)
 
-**Problem with threshold alerts:**
-```
-CPU > 80% → Alert!
-```
-- Noisy (spikes happen naturally)
-- Not tied to user impact
-- Alert fatigue
-
-**Better: SLO Burn-Rate Alerts**
+Threshold alerts (`CPU > 80% → Alert!`) are noisy and decoupled from user impact. Prefer burn-rate alerts tied to SLO consumption.
 
 **Example SLO:** 99.9% availability (43.2 minutes downtime per month)
 
@@ -323,38 +170,7 @@ CPU > 80% → Alert!
 | 6 hours | 6x | 5% in 6h | **P1** | Page business hours |
 | 3 days | 1x | 10% in 3d | **P2** | Ticket, investigate |
 
-**Why This Works:**
-- Alerts tied to user-impacting SLO violations
-- Fast burns (P0) indicate ongoing incident
-- Slow burns (P2) indicate trend, not emergency
-
-### Alert Best Practices
-
-**✅ Good Alert:**
-```yaml
-alert: HighErrorRate
-expr: |
-  (
-    sum(rate(http_requests_failed_total[5m]))
-    /
-    sum(rate(http_requests_total[5m]))
-  ) > 0.05
-for: 5m
-labels:
-  severity: P1
-annotations:
-  summary: "High error rate on {{ $labels.service }}"
-  description: "Error rate is {{ $value | humanizePercentage }}"
-  runbook: "https://wiki.company.com/runbooks/high-error-rate"
-```
-
-**❌ Bad Alert:**
-```yaml
-alert: SomethingWrong
-expr: thing > 100
-annotations:
-  summary: "Thing is bad"  # What thing? What should I do?
-```
+Fast burns indicate an ongoing incident; slow burns indicate a trend. Alert-rule YAML (Prometheus expr, runbook annotations) lives in the `gcp-observability` skill.
 
 **Alert Quality Checklist:**
 - [ ] Clear, actionable summary
@@ -415,61 +231,11 @@ annotations:
 
 ## SLO/SLA Definitions
 
-### SLO (Service Level Objective)
-
-**Internal target** for service reliability
-
-**Example SLOs:**
-```yaml
-# Availability SLO
-- name: API Availability
-  target: 99.9%
-  window: 30d
-  indicator: |
-    (successful_requests / total_requests) >= 0.999
-
-# Latency SLO
-- name: API Latency
-  target: 95th percentile < 500ms
-  window: 30d
-  indicator: |
-    histogram_quantile(0.95, http_request_duration_seconds) < 0.5
-```
-
-### Error Budget
-
-**Formula:**
-```
-Error Budget = 1 - SLO Target
-
-For 99.9% SLO:
-Error Budget = 1 - 0.999 = 0.1% = 43.2 minutes per month
-```
-
-**Error Budget Policy:**
-- **Budget > 0**: Team can take risks (deploy frequently, experiment)
-- **Budget exhausted**: Freeze risky changes, focus on reliability
-- **Budget negative**: All-hands incident response
-
-### SLA (Service Level Agreement)
-
-**Contractual commitment** to customers with penalties
-
-**Example SLA:**
-```
-99.95% monthly uptime
-If SLA missed:
-- 99.0-99.95%: 10% credit
-- 95.0-99.0%: 25% credit
-- <95.0%: 100% credit
-```
-
-**SLA ≤ SLO Always:**
-- SLO: 99.9% (internal target)
-- SLA: 99.5% (customer commitment)
-- Buffer: 0.4% to avoid SLA violations
+An SLO is the internal reliability target; the SLA is the contractual commitment to customers (with penalties). The error budget is `1 - SLO Target` (e.g., 99.9% SLO ⇒ 0.1% ⇒ ~43.2 min/month). Budget policy: spend it on risk while it lasts, freeze risky changes when exhausted, all-hands when negative. Always keep SLA ≤ SLO so the buffer absorbs noise. SLO/SLA YAML definitions and budget-tracking queries live in the `gcp-observability` skill.
 
 ## Production Readiness Checklist
+
+Drive production-readiness reviews from this per-pillar checklist (paired with the Maturity Scoring table below).
 
 ### Metrics
 - [ ] Golden Signals monitored (latency, traffic, errors, saturation)

@@ -154,102 +154,19 @@ Security specialist for application security, infrastructure hardening, and comp
 
 ## Hardcoded Secrets Detection
 
-### High-Risk Patterns (Blockers)
+Grep for these patterns during SAST; assignment of a literal value (not an env/vault lookup) is a blocker. Placeholders (`your-api-key-here`, `TODO: set from environment`) and clearly test/example credentials are false positives to skip.
 
-```python
-# Direct credentials
-password = "SuperSecret123"
-api_key = "sk-1234567890abcdef"
-DATABASE_URL = "postgresql://admin:password@localhost"
-
-# Cloud credentials
-AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
-GCP_SERVICE_ACCOUNT_KEY = '{"type": "service_account", ...}'
-
-# Private keys
-PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\n..."
-JWT_SECRET = "super-secret-jwt-key"
-
-# API tokens
-GITHUB_TOKEN = "ghp_1234567890abcdef"
-STRIPE_SECRET_KEY = "sk_live_1234567890"
-```
-
-### Detection Commands
-
-```bash
-# Search for common secret patterns
-grep -r "password\s*=\s*['\"]" . --exclude-dir=node_modules
-grep -r "api_key\s*=\s*['\"]" . --exclude-dir=venv
-grep -r "sk-[a-zA-Z0-9]{24,}" . --exclude=*.log
-grep -r "-----BEGIN.*PRIVATE KEY-----" .
-
-# Environment variable leaks
-grep -r "export.*PASSWORD" .
-grep -r "os.environ\[.*SECRET" .
-```
-
-### False Positives to Ignore
-
-```python
-# Placeholder values
-API_KEY = "your-api-key-here"
-PASSWORD = "TODO: set from environment"
-
-# Test/example credentials
-test_password = "test123"  # Used in test suite only
-EXAMPLE_TOKEN = "sk-1234567890abcdef"  # Documentation example
-```
+| Pattern | Example token shape | Note |
+|---------|--------------------|------|
+| Direct credential | `password = "..."`, `DATABASE_URL = "postgresql://user:pass@host"` | Inline literal, not env lookup |
+| Cloud key | `AKIA...` (AWS), service-account JSON | Long-lived cloud access |
+| Private key | `-----BEGIN PRIVATE KEY-----` | Never in source |
+| JWT/signing secret | `JWT_SECRET = "..."` | Move to secret manager |
+| API token | `sk-...`, `sk_live_...`, `ghp_...` | Provider-issued, high blast radius |
 
 ## Compliance Frameworks
 
-### SOC 2 Type II
-
-**Trust Service Principles:**
-
-1. **Security** - Protection against unauthorized access
-   - Access controls (authentication, authorization)
-   - Encryption (at rest, in transit)
-   - Network security (firewalls, VPCs)
-   - Monitoring and incident response
-
-2. **Availability** - System accessibility and performance
-   - Uptime SLAs (99.9%+)
-   - Disaster recovery plans
-   - Capacity planning
-   - Redundancy and failover
-
-3. **Processing Integrity** - Complete, valid, accurate processing
-   - Input validation
-   - Error handling and recovery
-   - Transaction logging
-   - Data integrity checks
-
-4. **Confidentiality** - Restricted information access
-   - Data classification
-   - Encryption requirements
-   - Access logging
-   - Secure disposal
-
-5. **Privacy** - Personal information handling
-   - Data minimization
-   - Consent management
-   - Retention policies
-   - Data subject rights
-
-### GDPR Compliance
-
-**Key Requirements:**
-
-| Requirement | Implementation | Validation |
-|-------------|----------------|------------|
-| **Lawful basis** | User consent, contract, legitimate interest | Documented basis for each data type |
-| **Data minimization** | Collect only necessary data | Review all data collection points |
-| **Right to access** | Data export endpoint | Test export functionality |
-| **Right to erasure** | Data deletion endpoint | Test complete deletion |
-| **Right to portability** | Machine-readable export | JSON/CSV export format |
-| **Breach notification** | 72-hour notification process | Incident response procedure |
-| **Data protection by design** | Privacy considerations in development | Architecture review |
+SOC 2 Trust Principles and GDPR rights/obligations detail live in the `compliance-frameworks` skill. Load it when mapping controls to a specific audit or assessing a project's regulatory posture.
 
 ## Threat Modeling (STRIDE)
 
@@ -357,61 +274,14 @@ EXAMPLE_TOKEN = "sk-1234567890abcdef"  # Documentation example
 
 ## Common Vulnerabilities and Mitigations
 
-### SQL Injection
+| Vulnerability | Mitigation |
+|---------------|------------|
+| SQL injection | Parameterized queries / ORM — never string-concatenate user input |
+| XSS | Output encoding / escaping, Content-Security-Policy headers |
+| Hardcoded secrets | Load from secret manager or environment, never inline literals |
+| Missing authorization | Enforce authz on every endpoint; verify ownership/role before access |
 
-**Vulnerable:**
-```python
-query = f"SELECT * FROM users WHERE username = '{username}'"
-cursor.execute(query)
-```
-
-**Secure:**
-```python
-query = "SELECT * FROM users WHERE username = %s"
-cursor.execute(query, (username,))
-```
-
-### XSS (Cross-Site Scripting)
-
-**Vulnerable:**
-```html
-<div>{user_input}</div>
-```
-
-**Secure:**
-```html
-<div>{{ user_input | escape }}</div>
-```
-
-### Hardcoded Secrets
-
-**Vulnerable:**
-```python
-API_KEY = "sk-1234567890abcdef"
-```
-
-**Secure:**
-```python
-API_KEY = os.environ["API_KEY"]
-```
-
-### Missing Authorization
-
-**Vulnerable:**
-```python
-@app.get("/users/{user_id}")
-def get_user(user_id: int):
-    return db.get_user(user_id)  # No auth check!
-```
-
-**Secure:**
-```python
-@app.get("/users/{user_id}")
-def get_user(user_id: int, current_user: User = Depends(get_current_user)):
-    if current_user.id != user_id and not current_user.is_admin:
-        raise HTTPException(403, "Forbidden")
-    return db.get_user(user_id)
-```
+FastAPI auth/JWT-claims enforcement patterns live in the `pyjwt-fastapi-validation` skill.
 
 ## Response Approach
 
