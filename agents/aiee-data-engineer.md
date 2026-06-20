@@ -251,25 +251,7 @@ ORDER BY pg_relation_size(indexrelid) DESC;
 
 ### Database Security Model
 
-**Two-User Separation Pattern:**
-
-```sql
--- Migration user: DDL operations (CREATE, ALTER, DROP)
-CREATE USER migration_user WITH PASSWORD 'secure_password';
-GRANT CREATE ON DATABASE myapp TO migration_user;
-GRANT ALL ON SCHEMA public TO migration_user;
-
--- Application user: DML operations only (SELECT, INSERT, UPDATE, DELETE)
-CREATE USER app_user WITH PASSWORD 'secure_password';
-GRANT CONNECT ON DATABASE myapp TO app_user;
-GRANT USAGE ON SCHEMA public TO app_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
-
--- Ensure future tables also grant to app_user
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
-```
+**Two-User Separation Pattern:** Provision a DDL-capable migration user and a DML-only application user. For the concrete `CREATE USER` / `GRANT` / `ALTER DEFAULT PRIVILEGES` provisioning SQL, see the `gcp-cloudsql-infrastructure` skill.
 
 **Why Separation?**
 - Application cannot drop tables or alter schema
@@ -297,22 +279,7 @@ Pool Size = (CPU Cores × 2) + Disk Spindles
 
 Example: 4-core database with 1 SSD → Pool size = 9-10
 
-**SQLAlchemy Configuration:**
-
-```python
-from sqlalchemy import create_engine
-from sqlalchemy.pool import QueuePool
-
-engine = create_engine(
-    "postgresql://user:pass@host/db",
-    poolclass=QueuePool,
-    pool_size=10,              # Max connections in pool
-    max_overflow=5,            # Additional connections beyond pool_size
-    pool_timeout=30,           # Wait up to 30s for connection
-    pool_recycle=3600,         # Recycle connections after 1h
-    pool_pre_ping=True,        # Check connection before use
-)
-```
+For async pool configuration (sizing, recycle, pre-ping), see the `psycopg3-async-patterns` skill.
 
 **Connection Leaks:**
 - Always close connections/sessions
@@ -333,34 +300,10 @@ engine = create_engine(
 
 **Cache Patterns:**
 
-**1. Cache-Aside (Lazy Loading):**
-```python
-def get_user(user_id):
-    # Check cache first
-    cached = redis.get(f"user:{user_id}")
-    if cached:
-        return json.loads(cached)
+- **Cache-Aside (Lazy Loading)** — read-through on miss, then populate.
+- **Write-Through** — update the database and the cache on every write.
 
-    # Cache miss, query DB
-    user = db.query(User).get(user_id)
-
-    # Write to cache
-    redis.setex(f"user:{user_id}", 3600, json.dumps(user))
-
-    return user
-```
-
-**2. Write-Through (Update cache on write):**
-```python
-def update_user(user_id, data):
-    # Update database
-    user = db.query(User).get(user_id)
-    user.update(data)
-    db.commit()
-
-    # Update cache
-    redis.setex(f"user:{user_id}", 3600, json.dumps(user))
-```
+For the Cache-Aside and Write-Through implementations (async client, TTL, serialization), see the `redis-async-caching-python` skill.
 
 **Cache Invalidation:**
 - **TTL** - Expire after time (good for rarely-changing data)
@@ -424,31 +367,7 @@ pg_restore -h localhost -U postgres -d myapp backup.dump
 | **Replication Lag** | < 1s | > 10s |
 | **Disk Usage** | < 80% | > 90% |
 
-**Monitoring Queries (PostgreSQL):**
-
-```sql
--- Slow queries
-SELECT query, calls, total_time, mean_time
-FROM pg_stat_statements
-ORDER BY mean_time DESC
-LIMIT 10;
-
--- Table sizes
-SELECT schemaname, tablename,
-       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
-FROM pg_tables
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
-LIMIT 10;
-
--- Index usage
-SELECT schemaname, tablename, indexname, idx_scan
-FROM pg_stat_user_indexes
-ORDER BY idx_scan DESC;
-
--- Active connections
-SELECT datname, count(*) FROM pg_stat_activity
-GROUP BY datname;
-```
+For runtime monitoring queries (pg_stat_statements slow queries, table sizes, index usage, active connections), see the `gcp-cloudsql-infrastructure` skill.
 
 ### Scaling Patterns
 

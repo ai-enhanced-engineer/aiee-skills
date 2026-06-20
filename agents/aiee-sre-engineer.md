@@ -673,20 +673,7 @@ escalation_policy:
 
 ### Autoscaling Configuration
 
-**Cloud Run Autoscaling:**
-```yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata:
-  name: example-service
-spec:
-  template:
-    metadata:
-      annotations:
-        autoscaling.knative.dev/minScale: "3"    # Always 3 instances
-        autoscaling.knative.dev/maxScale: "100"  # Scale up to 100
-        autoscaling.knative.dev/target: "70"     # Target 70% CPU
-```
+**Cloud Run Autoscaling:** See the `gcp-cloud-run` skill for autoscaling annotations (minScale/maxScale/target) and service configuration.
 
 **Kubernetes HPA:**
 ```yaml

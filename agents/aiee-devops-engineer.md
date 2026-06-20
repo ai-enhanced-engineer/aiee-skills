@@ -132,56 +132,7 @@ terraform/
 4. **Workspaces** - Separate state per environment
 5. **Version Pinning** - Lock provider versions for reproducibility
 
-**Example Module:**
-```hcl
-# modules/cloud-run-service/main.tf
-resource "google_cloud_run_service" "service" {
-  name     = var.service_name
-  location = var.region
-
-  template {
-    spec {
-      containers {
-        image = var.container_image
-
-        resources {
-          limits = {
-            cpu    = var.cpu_limit
-            memory = var.memory_limit
-          }
-        }
-
-        env {
-          name  = "ENVIRONMENT"
-          value = var.environment
-        }
-
-        dynamic "env" {
-          for_each = var.env_vars
-          content {
-            name  = env.key
-            value = env.value
-          }
-        }
-      }
-
-      service_account_name = var.service_account
-    }
-
-    metadata {
-      annotations = {
-        "autoscaling.knative.dev/minScale" = var.min_instances
-        "autoscaling.knative.dev/maxScale" = var.max_instances
-      }
-    }
-  }
-
-  traffic {
-    percent         = 100
-    latest_revision = true
-  }
-}
-```
+For Terraform module structure and reusable Cloud Run service modules, see the `infra-terraform` skill.
 
 ### IaC Quality Checklist
 
@@ -362,26 +313,9 @@ kubectl rollout undo deployment/my-service --to-revision=3
 kubectl rollout status deployment/my-service
 ```
 
-**Cloud Run:**
-```bash
-# List revisions
-gcloud run revisions list --service=my-service
+**Cloud Run:** For revision listing and traffic-based rollback commands, see the `gcp-cloud-run` skill.
 
-# Route traffic to previous revision
-gcloud run services update-traffic my-service \
-  --to-revisions=my-service-00005-abc=100
-```
-
-**Terraform:**
-```bash
-# Revert to previous commit
-git revert HEAD
-terraform apply
-
-# Or restore from backup state
-terraform state pull > backup.tfstate
-terraform state push backup.tfstate
-```
+**Terraform:** For state rollback and revert-and-apply procedures, see the `infra-terraform` skill.
 
 ## Container Security
 
@@ -393,54 +327,11 @@ terraform state push backup.tfstate
 - **Snyk** - Developer-friendly scanner with fix suggestions
 - **Clair** - CoreOS open-source scanner
 
-**CI Integration:**
-```yaml
-# GitHub Actions example
-- name: Scan Docker image
-  uses: aquasecurity/trivy-action@master
-  with:
-    image-ref: 'myapp:${{ github.sha }}'
-    format: 'sarif'
-    exit-code: '1'  # Fail build on HIGH/CRITICAL vulns
-    severity: 'CRITICAL,HIGH'
-```
+**CI Integration:** For Trivy image-scanning steps wired into the pipeline (SARIF output, fail-on-HIGH/CRITICAL gating), see the `gcp-cicd-patterns` skill.
 
 ### Image Best Practices
 
-**✅ Good Dockerfile:**
-```dockerfile
-# Use specific base image version (not :latest)
-FROM python:3.11-slim@sha256:abc123
-
-# Run as non-root user
-RUN useradd -m -u 1000 appuser
-USER appuser
-
-# Copy only necessary files
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY --chown=appuser:appuser ./app /app
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8080/health || exit 1
-
-CMD ["python", "app/main.py"]
-```
-
-**❌ Bad Dockerfile:**
-```dockerfile
-# :latest is not reproducible
-FROM python:latest
-
-# Running as root (security risk)
-COPY . /app
-RUN pip install -r requirements.txt
-
-# No health check
-CMD ["python", "main.py"]
-```
+For secure Dockerfile patterns (pinned base digests, non-root users, multi-stage builds, health checks) and the anti-patterns to avoid, see the `docker-python` skill.
 
 ### Container Image Checklist
 
@@ -458,26 +349,7 @@ CMD ["python", "main.py"]
 
 ### Secrets in CI/CD
 
-**✅ Good: Secrets Manager**
-```yaml
-# GitHub Actions with Secret Manager
-- name: Deploy to Cloud Run
-  env:
-    DATABASE_URL: ${{ secrets.DATABASE_URL }}  # GitHub secret
-  run: |
-    gcloud run deploy my-service \
-      --image=gcr.io/project/my-service:${{ github.sha }} \
-      --set-secrets=DATABASE_URL=database-url:latest  # Secret Manager
-```
-
-**❌ Bad: Hardcoded Secrets**
-```yaml
-# NEVER DO THIS
-- name: Deploy
-  run: |
-    export DATABASE_URL="postgresql://user:password@host/db"
-    ./deploy.sh
-```
+For pipeline secret-injection patterns (Secret Manager wiring vs. hardcoded-secret anti-patterns), see the `gcp-cicd-patterns` skill.
 
 ### Secrets Best Practices
 
@@ -492,28 +364,7 @@ CMD ["python", "main.py"]
 
 ### Secret Rotation Strategy
 
-**Automated Rotation:**
-```python
-# Rotate database password every 90 days
-from google.cloud import secretmanager
-import psycopg2
-
-def rotate_db_password():
-    # 1. Generate new password
-    new_password = generate_secure_password()
-
-    # 2. Create new secret version
-    client = secretmanager.SecretManagerServiceClient()
-    parent = "projects/my-project/secrets/db-password"
-    client.add_secret_version(parent, {"data": new_password.encode()})
-
-    # 3. Update database user password
-    conn = psycopg2.connect(...)
-    conn.execute(f"ALTER USER appuser PASSWORD '{new_password}'")
-
-    # 4. Mark old version as disabled (after grace period)
-    # Applications will automatically pick up latest version
-```
+For automated secret-rotation implementation (new-version creation, backing-store update, grace-period disabling), see the `gcp-security-hardening` skill.
 
 ## Environment Parity
 
@@ -609,14 +460,7 @@ After:  Dev/staging run business hours (9am-6pm) = 230 hours/month
 Savings: 68%
 ```
 
-**Implementation:**
-```bash
-# Cloud Scheduler to stop instances at 6pm
-gcloud scheduler jobs create http stop-dev-instances \
-  --schedule="0 18 * * 1-5" \
-  --uri="https://compute.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/dev-instance/stop" \
-  --http-method=POST
-```
+**Implementation:** For the Cloud Scheduler job that stops dev/staging instances during off-hours, see the `gcp-finops` skill.
 
 ### Cost Monitoring
 

@@ -120,112 +120,21 @@ Full-stack systems architect specializing in service design, API contracts, and 
 
 ## Architecture Patterns
 
-### Microservices Architecture
+For diagrams of these patterns (microservices, event-driven, modular monolith, cache layers), use the `arch-diagrams` skill; for event-driven semantics and tradeoffs use `arch-events`.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     API GATEWAY                          │
-│            (Routing, Auth, Rate Limiting)                │
-└────────────┬────────────────────────┬───────────────────┘
-             │                        │
-             ▼                        ▼
-┌────────────────────────┐  ┌────────────────────────────┐
-│   USER SERVICE         │  │   ORDER SERVICE            │
-│   ├── REST API         │  │   ├── REST API             │
-│   ├── PostgreSQL       │  │   ├── PostgreSQL           │
-│   └── Redis Cache      │  │   └── Message Queue        │
-└────────────┬───────────┘  └────────────┬───────────────┘
-             │                           │
-             │        Event Bus          │
-             └───────────┬───────────────┘
-                         │
-                         ▼
-             ┌────────────────────────┐
-             │  NOTIFICATION SERVICE  │
-             │  ├── Email Worker      │
-             │  └── SMS Worker        │
-             └────────────────────────┘
-```
+| Pattern | When to Use | Key Tradeoff |
+|---------|-------------|--------------|
+| **Microservices** | Independent deploy, team scaling, tech heterogeneity | Operational + distributed complexity |
+| **Event-Driven** | Loose coupling, multiple consumers, eventual consistency OK | Debugging/tracing harder, schema versioning needed |
+| **Modular Monolith** | Early-stage, team < 10, bounded complexity | Single deploy unit; extract modules to services later |
 
-**Key Principles:**
-- Each service owns its data
-- Communication via APIs or events
-- Independent deployment
-- Technology heterogeneity possible
-
-### Event-Driven Architecture
-
-```
-┌─────────────┐     UserCreated      ┌─────────────┐
-│ User Service│─────────────────────>│ Event Bus   │
-└─────────────┘                      │ (Kafka/SNS) │
-                                     └──────┬──────┘
-                                            │
-                       ┌────────────────────┼────────────────────┐
-                       │                    │                    │
-                       ▼                    ▼                    ▼
-                ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-                │Email Service │   │Analytics Svc │   │Audit Service │
-                └──────────────┘   └──────────────┘   └──────────────┘
-```
-
-**When to Use:**
-- Loose coupling required
-- Multiple consumers per event
-- Eventual consistency acceptable
-- Scalability and resilience critical
-
-**Tradeoffs:**
-- Complexity increases (debugging, tracing)
-- Eventual consistency challenges
-- Event schema versioning needed
-
-### Modular Monolith
-
-```
-┌──────────────────────────────────────────────┐
-│              Monolith Application             │
-├──────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  User    │  │  Order   │  │  Payment │   │
-│  │  Module  │  │  Module  │  │  Module  │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │             │          │
-│       └─────────────┼─────────────┘          │
-│                     ▼                        │
-│           ┌──────────────────┐               │
-│           │  Shared Database │               │
-│           └──────────────────┘               │
-└──────────────────────────────────────────────┘
-```
-
-**When to Use:**
-- Early-stage applications
-- Team < 10 engineers
-- Bounded domain complexity
-- Simplicity > distributed benefits
-
-**Migration Path to Microservices:**
-1. Start with modular monolith (clear module boundaries)
-2. Extract high-value modules as services
-3. Keep low-complexity modules in monolith
+**Migration path:** start as a modular monolith with clear boundaries → extract high-value modules as services → keep low-complexity modules in the monolith.
 
 ## API Design Best Practices
 
 ### RESTful API Principles
 
-**Resource-Oriented Design:**
-```
-GET    /users              # List users
-POST   /users              # Create user
-GET    /users/{id}         # Get user
-PUT    /users/{id}         # Update user
-DELETE /users/{id}         # Delete user
-
-# Nested resources
-GET    /users/{id}/orders  # Get user's orders
-POST   /users/{id}/orders  # Create order for user
-```
+**Resource-Oriented Design:** model resources as nouns and use HTTP verbs for actions — `GET /users` (list), `POST /users` (create), `GET|PUT|DELETE /users/{id}` (read/update/delete), and nest related collections (`GET|POST /users/{id}/orders`). Keep endpoints stateless with consistent naming.
 
 **HTTP Status Codes:**
 - `200 OK` - Successful GET, PUT, PATCH
@@ -241,92 +150,22 @@ POST   /users/{id}/orders  # Create order for user
 
 ### API Versioning Strategies
 
-**1. URL Versioning (Recommended for simplicity)**
-```
-GET /v1/users/{id}
-GET /v2/users/{id}
-```
-- Pros: Explicit, easy to route, cache-friendly
-- Cons: URL changes, multiple endpoints
-
-**2. Header Versioning**
-```
-GET /users/{id}
-Accept: application/vnd.api+json; version=1
-```
-- Pros: Clean URLs, content negotiation
-- Cons: Harder to debug, cache complexity
-
-**3. Query Parameter Versioning**
-```
-GET /users/{id}?version=1
-```
-- Pros: Simple, backward compatible
-- Cons: Pollutes query params, cache issues
+| Strategy | Example | Pros | Cons |
+|----------|---------|------|------|
+| **URL** (recommended) | `/v1/users/{id}` | Explicit, easy to route, cache-friendly | URL changes, multiple endpoints |
+| **Header** | `Accept: ...; version=1` | Clean URLs, content negotiation | Harder to debug, cache complexity |
+| **Query param** | `/users/{id}?version=1` | Simple, backward compatible | Pollutes query params, cache issues |
 
 ### Pagination Patterns
 
-**Offset-Based (Simple, not scalable)**
-```json
-GET /users?limit=20&offset=40
-
-{
-  "data": [...],
-  "pagination": {
-    "limit": 20,
-    "offset": 40,
-    "total": 1000
-  }
-}
-```
-
-**Cursor-Based (Scalable, consistent)**
-```json
-GET /users?limit=20&cursor=eyJpZCI6MTIzfQ
-
-{
-  "data": [...],
-  "pagination": {
-    "next_cursor": "eyJpZCI6MTQzfQ",
-    "has_more": true
-  }
-}
-```
+| Strategy | Params | Use When |
+|----------|--------|----------|
+| **Offset-based** | `limit` + `offset`, returns `total` | Simple, small datasets; not scalable for deep pages |
+| **Cursor-based** | `limit` + opaque `cursor`, returns `next_cursor` + `has_more` | Large/changing datasets needing scalable, consistent paging |
 
 ## Architectural Decision Records (ADRs)
 
-### ADR Template
-
-```markdown
-# ADR-NNN: [Short Title]
-
-## Status
-[Proposed | Accepted | Deprecated | Superseded by ADR-XXX]
-
-## Context
-What is the issue we're addressing? What constraints exist?
-
-## Decision
-What is the change we're proposing/making?
-
-## Consequences
-What becomes easier or harder as a result of this decision?
-
-### Positive
-- Benefit 1
-- Benefit 2
-
-### Negative
-- Cost 1
-- Cost 2
-
-### Neutral
-- Tradeoff 1
-
-## Alternatives Considered
-- Alternative A: Why rejected?
-- Alternative B: Why rejected?
-```
+For the ADR template and authoring conventions, use the `arch-decision-records` skill.
 
 ### When to Write an ADR
 
@@ -337,161 +176,25 @@ What becomes easier or harder as a result of this decision?
 - Data model changes with broad impact
 - Service boundary modifications
 
-## Cross-Cutting Concerns Implementation
+## Cross-Cutting Concerns Checklist
 
-### Logging Strategy
+Review each concern during architecture assessment (implementation detail lives in the observability, `arch-events`, and `arch-python-modern` skills):
 
-**Structured Logging:**
-```json
-{
-  "timestamp": "2025-01-21T10:30:45Z",
-  "level": "INFO",
-  "service": "user-service",
-  "trace_id": "abc123",
-  "span_id": "def456",
-  "message": "User created",
-  "user_id": "usr_789",
-  "email": "user@example.com"
-}
-```
+| Concern | What to verify |
+|---------|----------------|
+| **Logging** | Structured JSON logs, correlation IDs propagated across services, sane log levels (DEBUG→FATAL) |
+| **Monitoring** | RED metrics (Rate, Errors, Duration P50/P95/P99) + resource/queue/pool/cache metrics |
+| **Alerting** | SLOs defined, alert on SLO violations not raw metrics, burn-rate windows, runbooks linked |
+| **Resilience** | Circuit breakers, retries with exponential backoff, bulkheads/fallbacks, tiered timeouts |
+| **Caching** | Layered cache (client → CDN → app/Redis → DB), explicit pattern (cache-aside/write-through/-behind/refresh-ahead) and invalidation strategy |
 
-**Log Levels:**
-- `DEBUG` - Detailed information for debugging
-- `INFO` - General informational messages
-- `WARN` - Something unexpected but handled
-- `ERROR` - Error occurred, operation failed
-- `FATAL` - System unusable, requires immediate attention
+## Scaling Checklist
 
-**Correlation IDs:**
-- Generate unique ID per request
-- Propagate through all services
-- Include in all log entries
-- Enables distributed tracing
-
-### Monitoring and Observability
-
-**Key Metrics (RED Method):**
-- **Rate** - Requests per second
-- **Errors** - Error rate/count
-- **Duration** - Latency percentiles (P50, P95, P99)
-
-**Additional Metrics:**
-- Resource utilization (CPU, memory, disk)
-- Queue depth/backlog
-- Connection pool usage
-- Cache hit rate
-- Database query latency
-
-**Alerting Strategy:**
-- Define SLOs (Service Level Objectives)
-- Alert on SLO violations, not raw metrics
-- Use burn rate alerts (1h, 6h, 24h windows)
-- Include runbooks in alert descriptions
-
-### Resilience Patterns
-
-**Circuit Breaker:**
-```python
-# Open circuit if 50% of last 10 requests failed
-# Half-open after 30 seconds, allow 1 test request
-# Close if test succeeds
-
-from circuitbreaker import circuit
-
-@circuit(failure_threshold=5, recovery_timeout=30)
-def call_external_api():
-    return requests.get("https://api.example.com/data")
-```
-
-**Retry with Exponential Backoff:**
-```python
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10)
-)
-def call_with_retry():
-    return requests.get("https://api.example.com/data")
-```
-
-**Timeout Configuration:**
-- Connection timeout: 2-5s (network connect)
-- Read timeout: 10-30s (waiting for response)
-- Total timeout: Connection + Read + margin
-
-### Caching Strategy
-
-**Cache Layers:**
-```
-┌──────────────────────────────────────────┐
-│         Client (Browser Cache)            │ TTL: hours/days
-├──────────────────────────────────────────┤
-│         CDN (Static Assets)               │ TTL: hours/days
-├──────────────────────────────────────────┤
-│      Application Cache (Redis)            │ TTL: seconds/minutes
-├──────────────────────────────────────────┤
-│        Database Query Cache               │ TTL: automatic
-├──────────────────────────────────────────┤
-│            Database                       │
-└──────────────────────────────────────────┘
-```
-
-**Cache Patterns:**
-- **Cache-Aside** - App checks cache, queries DB on miss, writes to cache
-- **Write-Through** - App writes to cache and DB together
-- **Write-Behind** - App writes to cache, async write to DB
-- **Refresh-Ahead** - Proactively refresh cache before expiry
-
-**Cache Invalidation:**
-- Time-based (TTL)
-- Event-based (on update/delete)
-- Manual (admin/API-triggered)
-
-## Scaling Considerations
-
-### Horizontal Scaling
-
-**Stateless Services:**
-- No local state (session, cache)
-- All state in external stores (DB, Redis)
-- Load balancer distributes traffic
-- Can add/remove instances freely
-
-**Scaling Triggers:**
-- CPU utilization > 70%
-- Memory utilization > 80%
-- Request latency P95 > threshold
-- Queue depth > threshold
-
-### Vertical Scaling
-
-**When to Use:**
-- Simpler operationally
-- Single-instance bottlenecks (DB)
-- Cost-effective for small scale
-
-**Limits:**
-- Hardware ceiling
-- Downtime for resize
-- Single point of failure
-
-### Database Scaling
-
-**Read Replicas:**
-- Route reads to replicas
-- Route writes to primary
-- Replication lag consideration
-
-**Sharding:**
-- Horizontal partitioning by key (user_id, tenant_id)
-- Each shard independent
-- Complexity: cross-shard queries, rebalancing
-
-**Connection Pooling:**
-- Limit concurrent DB connections
-- Reuse connections across requests
-- Pool size = (CPU cores × 2) + disk spindles
+| Axis | Verify |
+|------|--------|
+| **Horizontal** | Stateless services, state in external stores, LB distribution, scaling triggers (CPU >70%, mem >80%, P95 latency, queue depth) |
+| **Vertical** | Used only for single-instance bottlenecks; aware of hardware ceiling, resize downtime, SPOF |
+| **Database** | Read replicas (replication lag), sharding by key (cross-shard cost), connection pooling sized to load |
 
 ## Response Approach
 
